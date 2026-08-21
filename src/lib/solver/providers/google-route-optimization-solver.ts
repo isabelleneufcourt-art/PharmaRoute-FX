@@ -13,6 +13,7 @@
  */
 
 import { roadDistanceKm, travelTimeMinutes } from "../geometry";
+import { decodePolyline, isPlausibleRouteGeometry } from "../polyline";
 import type { SolverInput, SolverResult, SolverRouteResult, SolverStopResult, VrptwSolver } from "../types";
 import { getGoogleAccessToken, parseServiceAccount, type GoogleServiceAccount } from "./google-auth";
 
@@ -24,6 +25,8 @@ interface OptimizeToursVisit {
 interface OptimizeToursRoute {
   visits?: OptimizeToursVisit[];
   metrics?: { travelDistanceMeters?: number | string; travelDuration?: string };
+  /** Tracé encodé de l'itinéraire complet (overview polyline), si fourni par l'API. */
+  routePolyline?: { points?: string };
 }
 
 interface OptimizeToursResponse {
@@ -163,11 +166,25 @@ export const googleRouteOptimizationSolver: VrptwSolver = {
       const travelDistanceMeters = Number(route.metrics?.travelDistanceMeters ?? 0);
       const travelDurationSeconds = Number(String(route.metrics?.travelDuration ?? "0s").replace("s", ""));
 
+      let geometry: [number, number][] | undefined;
+      if (route.routePolyline?.points) {
+        try {
+          const decoded = decodePolyline(route.routePolyline.points);
+          if (isPlausibleRouteGeometry(decoded)) geometry = decoded;
+        } catch (error) {
+          console.warn(
+            `[google-route-optimization-solver] Impossible de décoder le tracé du véhicule ${vehicleIndex + 1} :`,
+            error instanceof Error ? error.message : error
+          );
+        }
+      }
+
       return {
         vehicleIndex,
         stops: stopResults,
         totalDistanceKm: round2(travelDistanceMeters / 1000),
         totalDurationMin: Math.round(travelDurationSeconds / 60),
+        geometry,
       };
     });
 

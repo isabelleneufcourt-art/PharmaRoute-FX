@@ -10,6 +10,7 @@
  * plutôt que d'être planifié en retard.
  */
 
+import { decodePolyline, isPlausibleRouteGeometry } from "../polyline";
 import type { SolverInput, SolverResult, SolverRouteResult, SolverStopResult } from "../types";
 
 interface VroomStep {
@@ -23,6 +24,8 @@ interface VroomStep {
 interface VroomRoute {
   vehicle: number;
   steps: VroomStep[];
+  /** Tracé encodé (Encoded Polyline, précision 5), fourni par défaut par la plupart des configurations VROOM. */
+  geometry?: string;
 }
 
 interface VroomResponse {
@@ -132,11 +135,26 @@ export async function solveWithVroom(input: SolverInput, vroomUrl: string): Prom
     }
 
     const lastStep = vroomRoute.steps[vroomRoute.steps.length - 1];
+
+    let geometry: [number, number][] | undefined;
+    if (vroomRoute.geometry) {
+      try {
+        const decoded = decodePolyline(vroomRoute.geometry);
+        if (isPlausibleRouteGeometry(decoded)) geometry = decoded;
+      } catch (error) {
+        console.warn(
+          `[vroom-client] Impossible de décoder le tracé du véhicule ${vehicle.id + 1} :`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
     return {
       vehicleIndex: vehicle.id,
       stops: stopResults,
       totalDistanceKm: round2((lastStep?.distance ?? 0) / 1000),
       totalDurationMin: Math.round((lastStep?.duration ?? 0) / 60),
+      geometry,
     };
   });
 

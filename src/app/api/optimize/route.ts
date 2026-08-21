@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
             totalDistanceKm: route.totalDistanceKm,
             totalDurationMin: route.totalDurationMin,
             colorHex: getRouteColor(route.vehicleIndex),
+            geometry: route.geometry ? JSON.stringify(route.geometry) : null,
           },
         });
 

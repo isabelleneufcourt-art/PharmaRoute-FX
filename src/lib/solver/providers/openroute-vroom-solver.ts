@@ -8,11 +8,17 @@
  *  - Sinon, ORS_API_KEY configuré → matrice de distances/durées réelles via
  *    OpenRouteService, combinée à l'heuristique VRPTW interne.
  *  - Sinon → non configuré (voir `isConfigured`/`configurationHint`).
+ *
+ * Dans les deux cas, le tracé réel de chaque tournée (suit le réseau
+ * routier) est récupéré pour l'affichage sur la carte — voir `geometry` sur
+ * chaque `SolverRouteResult`. Un échec de récupération de géométrie (quota,
+ * requête invalide…) ne fait pas échouer l'optimisation : la tournée reste
+ * valide, simplement sans tracé détaillé (repli sur un trait direct).
  */
 
 import { runHeuristic, type DistanceFn, type EnginePoint } from "../heuristic-engine";
-import type { SolverInput, SolverResult, VrptwSolver } from "../types";
-import { fetchOrsMatrix } from "./ors-client";
+import type { SolverInput, SolverResult, SolverRouteResult, SolverStop, VrptwSolver } from "../types";
+import { fetchOrsMatrix, fetchOrsRouteGeometry, type OrsPoint } from "./ors-client";
 import { solveWithVroom } from "./vroom-client";
 
 function vroomUrl(): string | undefined {
@@ -23,6 +29,37 @@ function vroomUrl(): string | undefined {
 function orsApiKey(): string | undefined {
   const key = process.env.ORS_API_KEY?.trim();
   return key ? key : undefined;
+}
+
+/** Récupère et attache le tracé réel de chaque tournée non vide, via l'API Directions ORS. */
+async function attachOrsGeometries(
+  routes: SolverRouteResult[],
+  depot: OrsPoint,
+  stopsById: Map<string, SolverStop>,
+  apiKey: string
+): Promise<SolverRouteResult[]> {
+  return Promise.all(
+    routes.map(async (route) => {
+      if (route.stops.length === 0) return route;
+
+      const orderedPoints: OrsPoint[] = [
+        depot,
+        ...route.stops.map((s) => stopsById.get(s.pharmacyId)!),
+        depot,
+      ];
+
+      try {
+        const geometry = await fetchOrsRouteGeometry(orderedPoints, apiKey);
+        return { ...route, geometry };
+      } catch (error) {
+        console.warn(
+          `[openroute-vroom-solver] Tracé indisponible pour le véhicule ${route.vehicleIndex + 1} :`,
+          error instanceof Error ? error.message : error
+        );
+        return route;
+      }
+    })
+  );
 }
 
 async function solveWithOrsMatrix(input: SolverInput, apiKey: string): Promise<SolverResult> {
@@ -41,7 +78,12 @@ async function solveWithOrsMatrix(input: SolverInput, apiKey: string): Promise<S
     return { distanceKm: matrix.distanceKm[i][j], durationMin: matrix.durationMin[i][j] };
   };
 
-  return runHeuristic(input, dist);
+  const result = runHeuristic(input, dist);
+
+  const stopsById = new Map(input.stops.map((s) => [s.pharmacyId, s]));
+  const routes = await attachOrsGeometries(result.routes, input.depot, stopsById, apiKey);
+
+  return { ...result, routes };
 }
 
 export const openRouteVroomSolver: VrptwSolver = {

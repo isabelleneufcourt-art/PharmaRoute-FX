@@ -55,6 +55,13 @@ export interface SolverRouteResult {
   totalDistanceKm: number;
   /** Durée totale de la tournée, retour au dépôt inclus. */
   totalDurationMin: number;
+  /**
+   * Tracé réel de l'itinéraire (suit le réseau routier), sous forme de
+   * points [lat, lng] ordonnés dépôt → arrêts → dépôt. Absent pour la
+   * simulation interne (pas de réseau routier réel) ou si le fournisseur
+   * externe n'a pas pu fournir de géométrie.
+   */
+  geometry?: [number, number][];
 }
 
 export interface SolverResult {

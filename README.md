@@ -108,6 +108,14 @@ lieu de créer des doublons.
 L'écran Optimisation propose trois moteurs ; celui sélectionné est mémorisé
 sur chaque `Optimization` (badge visible sur l'écran Résultats).
 
+Avec OpenRouteService ou VROOM, le **tracé réel** de chaque tournée (suit le
+réseau routier, via l'API Directions d'OpenRouteService ou la géométrie
+renvoyée par VROOM/Google) est affiché sur la carte — trait plein. Sans
+tracé réel disponible (simulation interne, ou récupération de géométrie
+échouée), la carte affiche un trait **en pointillés** reliant directement
+dépôt → arrêts → dépôt, pour bien distinguer une approximation d'un vrai
+itinéraire.
+
 | Fournisseur | Variable(s) `.env` | Comportement |
 | --- | --- | --- |
 | **Simulation interne** | *(aucune)* | Toujours disponible. Distance à vol d'oiseau × facteur de circuité (1,3) + vitesse moyenne simulée (28 km/h), puis heuristique balayage + plus proche voisin + 2-opt. |

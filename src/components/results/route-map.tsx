@@ -31,6 +31,25 @@ export interface RouteMapRoute {
   vehicleLabel: string;
   colorHex: string;
   stops: RouteMapStop[];
+  /** Tracé réel (JSON de points [lat, lng]), ou `null` si non disponible (repli sur un trait direct). */
+  geometry: string | null;
+}
+
+/** Parse la géométrie stockée en base ; retourne `null` si absente ou invalide. */
+function parseRouteGeometry(geometry: string | null): [number, number][] | null {
+  if (!geometry) return null;
+  try {
+    const parsed = JSON.parse(geometry);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((p) => Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number"))
+    ) {
+      return parsed as [number, number][];
+    }
+  } catch {
+    // Géométrie corrompue ou format inattendu : on ignore et on repliera sur un trait direct.
+  }
+  return null;
 }
 
 export interface RouteMapProps {
@@ -85,9 +104,14 @@ export default function RouteMap({ depot, routes }: RouteMapProps) {
   const allPositions: [number, number][] = [];
   if (depotPosition) allPositions.push(depotPosition);
   for (const route of routes) {
-    for (const stop of route.stops) {
-      if (stop.pharmacy.latitude != null && stop.pharmacy.longitude != null) {
-        allPositions.push([stop.pharmacy.latitude, stop.pharmacy.longitude]);
+    const geometry = parseRouteGeometry(route.geometry);
+    if (geometry) {
+      allPositions.push(...geometry);
+    } else {
+      for (const stop of route.stops) {
+        if (stop.pharmacy.latitude != null && stop.pharmacy.longitude != null) {
+          allPositions.push([stop.pharmacy.latitude, stop.pharmacy.longitude]);
+        }
       }
     }
   }
@@ -113,18 +137,29 @@ export default function RouteMap({ depot, routes }: RouteMapProps) {
       )}
 
       {routes.map((route) => {
+        const realGeometry = parseRouteGeometry(route.geometry);
+
         const stopPositions = route.stops
           .filter((s) => s.pharmacy.latitude != null && s.pharmacy.longitude != null)
           .map((s) => [s.pharmacy.latitude as number, s.pharmacy.longitude as number] as [number, number]);
 
-        const path = depotPosition
-          ? [depotPosition, ...stopPositions, depotPosition]
-          : stopPositions;
+        // Tracé réel (suit le réseau routier) si disponible, sinon repli sur un trait direct
+        // dépôt → arrêts → dépôt (simulation interne, ou géométrie indisponible).
+        const path =
+          realGeometry ?? (depotPosition ? [depotPosition, ...stopPositions, depotPosition] : stopPositions);
 
         return (
           <React.Fragment key={route.id}>
             {path.length > 1 && (
-              <Polyline positions={path} pathOptions={{ color: route.colorHex, weight: 4, opacity: 0.7 }} />
+              <Polyline
+                positions={path}
+                pathOptions={{
+                  color: route.colorHex,
+                  weight: 4,
+                  opacity: 0.7,
+                  dashArray: realGeometry ? undefined : "6 6",
+                }}
+              />
             )}
             {route.stops.map(
               (stop) =>
