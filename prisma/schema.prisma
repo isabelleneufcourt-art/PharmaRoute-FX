@@ -158,5 +158,11 @@ model RouteStop {
   distanceFromPrevKm  Float?
   durationFromPrevMin Int?
 
+  /// Le chauffeur a-t-il coché cette livraison comme effectuée ? (feuille de route, écran 4)
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  /// Nombre de bacs vides récupérés par le chauffeur lors du passage
+  emptyBacsRetrieved Int @default(0)
+
   @@map("route_stops")
 }

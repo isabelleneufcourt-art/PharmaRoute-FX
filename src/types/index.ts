@@ -17,3 +17,11 @@ export type OptimizationWithRoutes = Prisma.OptimizationGetPayload<{
 
 export type RouteWithStops = OptimizationWithRoutes["routes"][number];
 export type RouteStopWithPharmacy = RouteWithStops["stops"][number];
+
+/** Une tournée avec son optimisation/dépôt parents, pour la feuille de route chauffeur. */
+export type RouteWithDetails = Prisma.RouteGetPayload<{
+  include: {
+    optimization: { include: { depot: true } };
+    stops: { include: { pharmacy: true } };
+  };
+}>;

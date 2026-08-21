@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Package } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Package, Printer } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -46,12 +48,12 @@ function RouteCard({ route }: { route: RouteWithStops }) {
 
   return (
     <Card className="overflow-hidden py-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full flex-wrap items-center justify-between gap-2 p-4 text-left"
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex w-full flex-wrap items-center justify-between gap-2 p-4">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex flex-wrap items-center gap-2 text-left"
+        >
           <span
             className="h-3 w-3 shrink-0 rounded-full"
             style={{ background: route.colorHex }}
@@ -71,15 +73,26 @@ function RouteCard({ route }: { route: RouteWithStops }) {
               {violations} retard{violations > 1 ? "s" : ""}
             </Badge>
           )}
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            {route.totalDistanceKm != null && <span>{route.totalDistanceKm.toFixed(1)} km</span>}
+            {route.totalDurationMin != null && (
+              <span>{formatDurationMinutes(route.totalDurationMin)}</span>
+            )}
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/driver-sheet/${route.id}`}>
+              <Printer className="h-3 w-3" />
+              Feuille de route
+            </Link>
+          </Button>
+          <button type="button" onClick={() => setOpen((v) => !v)} aria-label="Afficher/masquer">
+            <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+          </button>
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {route.totalDistanceKm != null && <span>{route.totalDistanceKm.toFixed(1)} km</span>}
-          {route.totalDurationMin != null && (
-            <span>{formatDurationMinutes(route.totalDurationMin)}</span>
-          )}
-          <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
-        </div>
-      </button>
+      </div>
 
       {open &&
         (route.stops.length === 0 ? (

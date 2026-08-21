@@ -64,3 +64,16 @@ export const optimizeRequestSchema = z
   .strict();
 
 export type OptimizeRequestInput = z.infer<typeof optimizeRequestSchema>;
+
+/** Mise à jour terrain d'un arrêt par le chauffeur (feuille de route, écran 4). */
+export const routeStopUpdateSchema = z
+  .object({
+    completed: z.boolean().optional(),
+    emptyBacsRetrieved: z.coerce.number().int().min(0).max(999).optional(),
+  })
+  .strict()
+  .refine((data) => data.completed !== undefined || data.emptyBacsRetrieved !== undefined, {
+    message: "Aucune donnée à mettre à jour",
+  });
+
+export type RouteStopUpdateInput = z.infer<typeof routeStopUpdateSchema>;

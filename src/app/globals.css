@@ -113,4 +113,13 @@ body {
   body {
     background: white;
   }
+  /* Conserve les couleurs (badges, pastilles de tournée) même sans "graphismes
+     d'arrière-plan" activé dans la boîte de dialogue d'impression. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page {
+    margin: 14mm 12mm;
+  }
 }
