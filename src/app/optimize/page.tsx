@@ -11,15 +11,20 @@ import { getSolverAvailability } from "@/lib/solver";
 export const dynamic = "force-dynamic";
 
 export default async function OptimizePage() {
-  const [depot, pharmacyCount, recentOptimizations] = await Promise.all([
+  const [depot, pharmacies, recentOptimizations] = await Promise.all([
     prisma.depot.findFirst({ where: { isActive: true } }),
-    prisma.pharmacy.count({ where: { isActive: true } }),
+    prisma.pharmacy.findMany({
+      where: { isActive: true },
+      select: { id: true, apbCode: true, name: true, postalCode: true, city: true },
+      orderBy: [{ postalCode: "asc" }, { name: "asc" }],
+    }),
     prisma.optimization.findMany({
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
   ]);
 
+  const pharmacyCount = pharmacies.length;
   const canOptimize = Boolean(depot) && pharmacyCount > 0;
   const suggestedVehicleCount = Math.max(1, Math.min(8, Math.ceil(pharmacyCount / 4) || 1));
   const solverAvailability = getSolverAvailability();
@@ -52,7 +57,7 @@ export default async function OptimizePage() {
 
       <OptimizeForm
         defaultDepartureTime={depot?.openingTime ?? "06:30"}
-        pharmacyCount={pharmacyCount}
+        pharmacies={pharmacies}
         suggestedVehicleCount={suggestedVehicleCount}
         disabled={!canOptimize}
         solverAvailability={solverAvailability}

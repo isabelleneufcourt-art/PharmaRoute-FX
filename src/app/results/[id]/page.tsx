@@ -4,11 +4,13 @@ import { AlertTriangle, ArrowLeft, Clock, Gauge, MapPinned, Satellite, Truck } f
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DelaySuggestionBanner } from "@/components/results/delay-suggestion-banner";
 import { RouteListPanel } from "@/components/results/route-list-panel";
 import { RouteMapLoader } from "@/components/results/route-map-loader";
 import { formatDurationMinutes } from "@/lib/time";
 import { SOLVER_PROVIDER_LABELS } from "@/lib/solver/labels";
 import { prisma } from "@/lib/prisma";
+import { formatDateOnly } from "@/lib/weekday";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,9 @@ export default async function ResultsDetailPage({ params }: { params: { id: stri
   }
 
   const totalStops = optimization.routes.reduce((sum, r) => sum + r.stops.length, 0);
+  const selectedPharmacyIds: string[] | null = optimization.selectedPharmacyIds
+    ? (JSON.parse(optimization.selectedPharmacyIds) as string[])
+    : null;
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
@@ -118,6 +123,19 @@ export default async function ResultsDetailPage({ params }: { params: { id: stri
           )}
         </div>
       </div>
+
+      {optimization.violationsCount != null && optimization.violationsCount > 0 && (
+        <div className="no-print px-4 pt-3">
+          <DelaySuggestionBanner
+            violationsCount={optimization.violationsCount}
+            vehicleCount={optimization.vehicleCount}
+            departureTime={optimization.departureTime}
+            deliveryDate={formatDateOnly(optimization.deliveryDate)}
+            solverProvider={optimization.solverProvider}
+            selectedPharmacyIds={selectedPharmacyIds}
+          />
+        </div>
+      )}
 
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         <div className="no-print w-full overflow-y-auto border-b border-border lg:w-[440px] lg:shrink-0 lg:border-b-0 lg:border-r">

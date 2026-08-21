@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { vehicleCount, departureTime, deliveryDate, solverProvider } =
+    const { vehicleCount, departureTime, deliveryDate, solverProvider, pharmacyIds } =
       optimizeRequestSchema.parse(body);
 
     const deliveryDateObj = parseDateOnly(deliveryDate);
@@ -47,13 +47,23 @@ export async function POST(request: NextRequest) {
 
     // Seules les pharmacies ayant au moins un créneau ouvert ce jour-là participent
     // à l'optimisation ; les autres sont simplement absentes de cette tournée.
-    const pharmacies = allPharmacies.filter((p) => p.timeWindows.length > 0);
-    const excludedCount = allPharmacies.length - pharmacies.length;
+    const openToday = allPharmacies.filter((p) => p.timeWindows.length > 0);
+    const excludedCount = allPharmacies.length - openToday.length;
+
+    // Sélection manuelle du dispatcher (cases cochées à l'écran Optimisation) :
+    // restreint encore la liste aux pharmacies choisies parmi celles ouvertes ce jour-là.
+    const selectedIdSet = pharmacyIds ? new Set(pharmacyIds) : null;
+    const pharmacies = selectedIdSet
+      ? openToday.filter((p) => selectedIdSet.has(p.id))
+      : openToday;
+    const deselectedCount = selectedIdSet ? openToday.length - pharmacies.length : 0;
+
     if (pharmacies.length === 0) {
       return NextResponse.json(
         {
-          error:
-            "Aucune pharmacie n'a de créneau ouvert ce jour-là. Vérifiez la grille horaire des pharmacies ou choisissez une autre date.",
+          error: selectedIdSet
+            ? "Aucune des pharmacies sélectionnées n'a de créneau ouvert ce jour-là."
+            : "Aucune pharmacie n'a de créneau ouvert ce jour-là. Vérifiez la grille horaire des pharmacies ou choisissez une autre date.",
         },
         { status: 400 }
       );
@@ -99,6 +109,7 @@ export async function POST(request: NextRequest) {
         departureTime,
         deliveryDate: deliveryDateObj,
         solverProvider,
+        selectedPharmacyIds: pharmacyIds ? JSON.stringify(pharmacyIds) : null,
         status: "RUNNING",
       },
     });
@@ -177,6 +188,7 @@ export async function POST(request: NextRequest) {
         optimizationId: optimization.id,
         unassignedCount: result.unassignedPharmacyIds?.length ?? 0,
         excludedCount,
+        deselectedCount,
       },
       { status: 201 }
     );

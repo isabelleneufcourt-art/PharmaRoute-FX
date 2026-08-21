@@ -157,6 +157,11 @@ model Optimization {
   status         OptimizationStatus @default(PENDING)
   solverProvider SolverProvider     @default(INTERNAL)
 
+  /// Sélection explicite de pharmacies faite par le dispatcher avant le calcul
+  /// (liste d'ids sérialisée en JSON). `null` = aucune sélection manuelle,
+  /// toutes les pharmacies ouvertes ce jour-là ont été incluses.
+  selectedPharmacyIds String?
+
   totalDistanceKm  Float?
   totalDurationMin Int?
   /// Nombre d'arrêts dont la fenêtre horaire n'a pas été respectée

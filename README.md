@@ -128,6 +128,32 @@ lancement :
   tournées et la feuille de route ; l'heure de calcul reste visible en
   information secondaire sur l'écran Résultats détaillé.
 
+## Sélection des pharmacies à inclure
+
+L'écran Optimisation liste toutes les pharmacies actives sous forme de cases
+à cocher (toutes cochées par défaut), avec une barre de recherche (nom, code
+APB, code postal, ville) pour retrouver rapidement quelques pharmacies parmi
+une longue liste, et des boutons "Tout sélectionner" / "Tout désélectionner".
+Le calcul ne porte que sur les pharmacies cochées — pratique pour ne
+planifier qu'une partie de la tournée (ex. une zone, ou un sous-ensemble de
+clients pour un test). La sélection est mémorisée sur l'optimisation créée et
+réutilisée automatiquement par le bouton de ré-optimisation ci-dessous.
+
+## Ajustement automatique en cas de retard
+
+Quand une optimisation comporte au moins un arrêt "hors créneau" (retard),
+l'écran Résultats affiche un bandeau d'alerte avec deux suggestions,
+relançables en un clic sans ressaisir les paramètres :
+
+- **Ajouter un véhicule et relancer** — relance le calcul avec un véhicule de
+  plus (même date, même heure de départ, mêmes pharmacies sélectionnées).
+- **Avancer le départ de 30 min et relancer** — relance le calcul avec une
+  heure de départ du dépôt avancée de 30 minutes.
+
+Chaque clic crée une nouvelle optimisation (visible dans l'historique) et
+redirige vers ses résultats ; l'optimisation d'origine reste consultable si
+l'ajustement ne convient pas.
+
 ## Import CSV/Excel des pharmacies
 
 Le formulaire d'import (`/`) accepte `.csv`, `.xlsx`, `.xls`. Les en-têtes de

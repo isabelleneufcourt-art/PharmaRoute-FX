@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Play, Truck } from "lucide-react";
+import { Loader2, Play, Search, Truck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -26,9 +26,17 @@ interface SolverAvailabilityEntry {
   hint: string;
 }
 
+interface PharmacyOption {
+  id: string;
+  apbCode: string;
+  name: string;
+  postalCode: string;
+  city: string;
+}
+
 interface OptimizeFormProps {
   defaultDepartureTime: string;
-  pharmacyCount: number;
+  pharmacies: PharmacyOption[];
   suggestedVehicleCount: number;
   disabled?: boolean;
   solverAvailability: Record<SolverProviderId, SolverAvailabilityEntry>;
@@ -40,9 +48,16 @@ const SOLVER_OPTIONS: { id: SolverProviderId; label: string }[] = [
   { id: "GOOGLE_ROUTE_OPTIMIZATION", label: "Google Route Optimization" },
 ];
 
+function normalize(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export function OptimizeForm({
   defaultDepartureTime,
-  pharmacyCount,
+  pharmacies,
   suggestedVehicleCount,
   disabled = false,
   solverAvailability,
@@ -53,13 +68,48 @@ export function OptimizeForm({
   const [deliveryDate, setDeliveryDate] = React.useState(() => formatDateOnly(new Date()));
   const [solverProvider, setSolverProvider] = React.useState<SolverProviderId>("INTERNAL");
   const [loading, setLoading] = React.useState(false);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(
+    () => new Set(pharmacies.map((p) => p.id))
+  );
+  const [search, setSearch] = React.useState("");
 
   const selectedHint = solverAvailability[solverProvider]?.hint;
   const weekday = deliveryDate ? getWeekdayFromDate(parseDateOnly(deliveryDate)) : null;
   const isSunday = deliveryDate !== "" && weekday === null;
 
+  const filteredPharmacies = React.useMemo(() => {
+    const term = normalize(search.trim());
+    if (!term) return pharmacies;
+    return pharmacies.filter((p) =>
+      [p.name, p.apbCode, p.postalCode, p.city].some((field) => normalize(field).includes(term))
+    );
+  }, [pharmacies, search]);
+
+  function toggleOne(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(pharmacies.map((p) => p.id)));
+  }
+
+  function deselectAll() {
+    setSelectedIds(new Set());
+  }
+
+  const noneSelected = selectedIds.size === 0;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (noneSelected) {
+      toast.error("Sélectionnez au moins une pharmacie");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -71,6 +121,7 @@ export function OptimizeForm({
           departureTime,
           deliveryDate,
           solverProvider,
+          pharmacyIds: Array.from(selectedIds),
         }),
       });
       const json = await res.json();
@@ -83,6 +134,11 @@ export function OptimizeForm({
       if (json.excludedCount > 0) {
         toast.warning(
           `${json.excludedCount} pharmacie(s) fermée(s) ce jour-là n'ont pas été incluses dans le calcul.`
+        );
+      }
+      if (json.deselectedCount > 0) {
+        toast.info(
+          `${json.deselectedCount} pharmacie(s) non sélectionnée(s) n'ont pas été incluses dans le calcul.`
         );
       }
       if (json.unassignedCount > 0) {
@@ -108,8 +164,8 @@ export function OptimizeForm({
           <CardTitle>Paramètres de la tournée</CardTitle>
         </div>
         <CardDescription>
-          Le solver répartit les {pharmacyCount} pharmacie{pharmacyCount > 1 ? "s" : ""} entre les
-          véhicules disponibles, en respectant au mieux leurs fenêtres horaires.
+          Le solver répartit les pharmacies sélectionnées entre les véhicules disponibles, en
+          respectant au mieux leurs fenêtres horaires.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -199,11 +255,98 @@ export function OptimizeForm({
             </p>
           </div>
 
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label>Pharmacies à inclure</Label>
+              <Badge variant={noneSelected ? "warning" : "outline"}>
+                {selectedIds.size} / {pharmacies.length} sélectionnée
+                {selectedIds.size > 1 ? "s" : ""}
+              </Badge>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Rechercher (nom, code APB, code postal, ville)…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  disabled={disabled}
+                  className="pl-8"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={selectAll}
+                disabled={disabled}
+              >
+                Tout sélectionner
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={deselectAll}
+                disabled={disabled}
+              >
+                Tout désélectionner
+              </Button>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto rounded-md border border-border">
+              {filteredPharmacies.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">Aucune pharmacie ne correspond.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {filteredPharmacies.map((pharmacy) => {
+                    const checked = selectedIds.has(pharmacy.id);
+                    return (
+                      <li key={pharmacy.id}>
+                        <label
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent/50",
+                            disabled && "pointer-events-none opacity-60"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 shrink-0 rounded border-input accent-primary"
+                            checked={checked}
+                            onChange={(e) => toggleOne(pharmacy.id, e.target.checked)}
+                            disabled={disabled}
+                          />
+                          <span className="flex-1 truncate">
+                            <span className="font-medium">{pharmacy.name}</span>{" "}
+                            <span className="text-xs text-muted-foreground">
+                              {pharmacy.postalCode} {pharmacy.city} · {pharmacy.apbCode}
+                            </span>
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+            {noneSelected && (
+              <p className="text-xs text-destructive">
+                Sélectionnez au moins une pharmacie pour lancer un calcul.
+              </p>
+            )}
+          </div>
+
           <div className="sm:col-span-2">
             <Button
               type="submit"
               disabled={
-                disabled || loading || isSunday || !solverAvailability[solverProvider]?.configured
+                disabled ||
+                loading ||
+                isSunday ||
+                noneSelected ||
+                !solverAvailability[solverProvider]?.configured
               }
             >
               {loading ? (

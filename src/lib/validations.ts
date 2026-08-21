@@ -116,6 +116,10 @@ export const optimizeRequestSchema = z
     solverProvider: z
       .enum(["INTERNAL", "GOOGLE_ROUTE_OPTIMIZATION", "OPENROUTE_VROOM"])
       .default("INTERNAL"),
+    /// Sélection manuelle des pharmacies à inclure (cases à cochées sur l'écran
+    /// Optimisation). `undefined`/absent = toutes les pharmacies ouvertes ce
+    /// jour-là sont incluses (comportement historique).
+    pharmacyIds: z.array(z.string().min(1)).min(1, "Sélectionnez au moins une pharmacie").optional(),
   })
   .strict();
 
