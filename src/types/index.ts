@@ -1,12 +1,16 @@
-import type { Depot, Pharmacy, Prisma } from "@/generated/prisma/client";
+import type { Depot, Pharmacy, Prisma, User } from "@/generated/prisma/client";
 
-export type { Depot, Pharmacy };
+export type { Depot, Pharmacy, User };
+
+/** Utilisateur chauffeur, tel qu'exposé au dispatcher pour l'assignation de tournées. */
+export type DriverOption = Pick<User, "id" | "name" | "email">;
 
 export type OptimizationWithRoutes = Prisma.OptimizationGetPayload<{
   include: {
     depot: true;
     routes: {
       include: {
+        driver: true;
         stops: {
           include: { pharmacy: true };
         };

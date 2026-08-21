@@ -12,6 +12,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  /// Accès complet : import, création/lancement d'optimisation, modification.
+  DISPATCHER
+  /// Accès restreint : uniquement ses feuilles de route (mobile), lecture + case à cocher.
+  DRIVER
+}
+
+/// Compte utilisateur (authentification par email/mot de passe).
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(DRIVER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  /// Tournées assignées à ce chauffeur (rôle DRIVER)
+  routes Route[] @relation("RouteDriver")
+
+  @@map("users")
+}
+
 /// Dépôt central (point de départ / retour des tournées)
 model Depot {
   id          String   @id @default(cuid())
@@ -127,6 +150,10 @@ model Route {
   geometry         String?
   /// Couleur d'affichage sur la carte (hex)
   colorHex         String  @default("#2563eb")
+
+  /// Chauffeur (rôle DRIVER) assigné à cette tournée — donne accès à sa feuille de route
+  driverId String?
+  driver   User?   @relation("RouteDriver", fields: [driverId], references: [id])
 
   stops RouteStop[]
 

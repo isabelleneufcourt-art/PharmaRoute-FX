@@ -2,11 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Package, Printer } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Package, Printer, User } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -17,13 +26,14 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { formatDurationMinutes } from "@/lib/time";
-import type { RouteWithStops } from "@/types";
+import type { DriverOption, RouteWithStops } from "@/types";
 
 interface RouteListPanelProps {
   routes: RouteWithStops[];
+  drivers: DriverOption[];
 }
 
-export function RouteListPanel({ routes }: RouteListPanelProps) {
+export function RouteListPanel({ routes, drivers }: RouteListPanelProps) {
   if (routes.length === 0) {
     return (
       <div className="p-4 text-sm text-muted-foreground">
@@ -35,16 +45,36 @@ export function RouteListPanel({ routes }: RouteListPanelProps) {
   return (
     <div className="flex flex-col gap-3 p-4">
       {routes.map((route) => (
-        <RouteCard key={route.id} route={route} />
+        <RouteCard key={route.id} route={route} drivers={drivers} />
       ))}
     </div>
   );
 }
 
-function RouteCard({ route }: { route: RouteWithStops }) {
+function RouteCard({ route, drivers }: { route: RouteWithStops; drivers: DriverOption[] }) {
+  const router = useRouter();
   const [open, setOpen] = React.useState(true);
+  const [assigning, setAssigning] = React.useState(false);
   const violations = route.stops.filter((s) => !s.withinTimeWindow).length;
   const totalBacs = route.stops.reduce((sum, s) => sum + s.pharmacy.bacsCount, 0);
+
+  async function handleAssignDriver(value: string) {
+    setAssigning(true);
+    try {
+      const res = await fetch(`/api/routes/${route.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId: value === "none" ? null : value }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Chauffeur mis à jour");
+      router.refresh();
+    } catch {
+      toast.error("Impossible d'assigner le chauffeur");
+    } finally {
+      setAssigning(false);
+    }
+  }
 
   return (
     <Card className="overflow-hidden py-0">
@@ -92,6 +122,28 @@ function RouteCard({ route }: { route: RouteWithStops }) {
             <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
           </button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 border-t border-border px-4 py-2.5">
+        <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Chauffeur</span>
+        <Select
+          value={route.driverId ?? "none"}
+          onValueChange={handleAssignDriver}
+          disabled={assigning}
+        >
+          <SelectTrigger className="h-7 w-56 text-xs">
+            <SelectValue placeholder="Non assigné" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Non assigné</SelectItem>
+            {drivers.map((driver) => (
+              <SelectItem key={driver.id} value={driver.id}>
+                {driver.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {open &&

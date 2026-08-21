@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { routeStopUpdateSchema } from "@/lib/validations";
 
@@ -10,8 +11,24 @@ import { routeStopUpdateSchema } from "@/lib/validations";
  */
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
     const body = await request.json();
     const data = routeStopUpdateSchema.parse(body);
+
+    // Un chauffeur ne peut mettre à jour que les arrêts de ses propres tournées.
+    if (session.user.role === "DRIVER") {
+      const stop = await prisma.routeStop.findUnique({
+        where: { id: params.id },
+        select: { route: { select: { driverId: true } } },
+      });
+      if (!stop || stop.route.driverId !== session.user.id) {
+        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+      }
+    }
 
     const routeStop = await prisma.routeStop.update({
       where: { id: params.id },

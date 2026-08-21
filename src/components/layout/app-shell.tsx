@@ -1,16 +1,22 @@
 import Link from "next/link";
-import { Truck, LayoutDashboard, Route as RouteIcon, ClipboardList } from "lucide-react";
+import { ClipboardList, LayoutDashboard, ListChecks, Route as RouteIcon, Truck } from "lucide-react";
 
+import { auth } from "@/auth";
+import { UserMenu } from "@/components/layout/user-menu";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Dépôt & Pharmacies", icon: LayoutDashboard, enabled: true },
-  { href: "/optimize", label: "Optimisation", icon: RouteIcon, enabled: true },
-  { href: "/results", label: "Résultats", icon: ClipboardList, enabled: true },
+const DISPATCHER_NAV_ITEMS = [
+  { href: "/", label: "Dépôt & Pharmacies", icon: LayoutDashboard },
+  { href: "/optimize", label: "Optimisation", icon: RouteIcon },
+  { href: "/results", label: "Résultats", icon: ClipboardList },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+const DRIVER_NAV_ITEMS = [{ href: "/my-routes", label: "Mes tournées", icon: ListChecks }];
+
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  const navItems = session?.user.role === "DRIVER" ? DRIVER_NAV_ITEMS : DISPATCHER_NAV_ITEMS;
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="no-print sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur">
@@ -27,29 +33,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <nav className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.enabled ? item.href : "#"}
-                aria-disabled={!item.enabled}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  item.enabled
-                    ? "text-foreground hover:bg-accent hover:text-accent-foreground"
-                    : "pointer-events-none text-muted-foreground/50"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-                {!item.enabled && (
-                  <Badge variant="outline" className="ml-1 text-[10px]">
-                    Bientôt
-                  </Badge>
-                )}
-              </Link>
-            ))}
-          </nav>
+          {session?.user && (
+            <div className="flex items-center gap-2">
+              <nav className="flex items-center gap-1">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </Link>
+                ))}
+              </nav>
+              <div className="mx-1 h-6 w-px bg-border" aria-hidden />
+              <UserMenu name={session.user.name ?? session.user.email ?? ""} role={session.user.role} />
+            </div>
+          )}
         </div>
       </header>
 

@@ -64,11 +64,26 @@ export interface SolverResult {
   totalDurationMin: number;
   /** Nombre d'arrêts dont la fenêtre horaire n'a pas été respectée. */
   violationsCount: number;
+  /**
+   * Pharmacies qu'un solver à contraintes strictes (ex: VROOM) n'a pas pu
+   * intégrer à aucune tournée sans violer une fenêtre horaire. Vide pour les
+   * solvers qui assignent systématiquement tous les arrêts (INTERNAL,
+   * OpenRouteService via l'heuristique interne).
+   */
+  unassignedPharmacyIds?: string[];
 }
 
 export type SolverProviderId = "INTERNAL" | "GOOGLE_ROUTE_OPTIMIZATION" | "OPENROUTE_VROOM";
 
 export interface VrptwSolver {
   readonly id: SolverProviderId;
+  readonly label: string;
+  /** Le fournisseur dispose-t-il de la configuration requise (clé API, endpoint…) ? */
+  isConfigured(): boolean;
+  /** Message expliquant comment configurer ce fournisseur, affiché s'il n'est pas prêt. */
+  configurationHint(): string;
   solve(input: SolverInput): Promise<SolverResult>;
 }
+
+/** Erreur levée quand un solver externe n'est pas configuré (clé API / endpoint manquant). */
+export class SolverConfigurationError extends Error {}

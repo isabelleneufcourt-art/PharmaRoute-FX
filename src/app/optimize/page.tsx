@@ -6,6 +6,7 @@ import { OptimizeForm } from "@/components/optimize/optimize-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
+import { getSolverAvailability } from "@/lib/solver";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function OptimizePage() {
 
   const canOptimize = Boolean(depot) && pharmacyCount > 0;
   const suggestedVehicleCount = Math.max(1, Math.min(8, Math.ceil(pharmacyCount / 4) || 1));
+  const solverAvailability = getSolverAvailability();
 
   return (
     <div className="container flex flex-col gap-6 py-6">
@@ -53,6 +55,7 @@ export default async function OptimizePage() {
         pharmacyCount={pharmacyCount}
         suggestedVehicleCount={suggestedVehicleCount}
         disabled={!canOptimize}
+        solverAvailability={solverAvailability}
       />
 
       <OptimizationHistory optimizations={recentOptimizations} />

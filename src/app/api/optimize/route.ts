@@ -30,6 +30,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // On vérifie la configuration du solver AVANT de créer quoi que ce soit en
+    // base : un fournisseur externe mal configuré ne doit pas laisser
+    // d'optimisation "RUNNING"/"FAILED" orpheline.
+    const solver = getSolver(solverProvider);
+    if (!solver.isConfigured()) {
+      return NextResponse.json({ error: solver.configurationHint() }, { status: 400 });
+    }
+
     // Géocodage de secours pour le dépôt / les pharmacies sans coordonnées connues.
     let depotLat = depot.latitude;
     let depotLng = depot.longitude;
@@ -65,7 +73,6 @@ export async function POST(request: NextRequest) {
     });
     optimizationId = optimization.id;
 
-    const solver = getSolver(solverProvider);
     const result = await solver.solve({
       depot: { lat: depotLat, lng: depotLng },
       stops: pharmaciesWithCoords.map((pharmacy) => ({
@@ -122,7 +129,13 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    return NextResponse.json({ optimizationId: optimization.id }, { status: 201 });
+    return NextResponse.json(
+      {
+        optimizationId: optimization.id,
+        unassignedCount: result.unassignedPharmacyIds?.length ?? 0,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(
@@ -131,20 +144,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const message = error instanceof Error ? error.message : "Erreur inconnue";
     console.error("[POST /api/optimize]", error);
 
     if (optimizationId) {
       await prisma.optimization
         .update({
           where: { id: optimizationId },
-          data: {
-            status: "FAILED",
-            errorMessage: error instanceof Error ? error.message : "Erreur inconnue",
-          },
+          data: { status: "FAILED", errorMessage: message },
         })
         .catch(() => undefined);
     }
 
-    return NextResponse.json({ error: "Le calcul de l'optimisation a échoué" }, { status: 500 });
+    return NextResponse.json(
+      { error: `Le calcul de l'optimisation a échoué : ${message}` },
+      { status: 500 }
+    );
   }
 }

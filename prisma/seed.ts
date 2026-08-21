@@ -1,9 +1,44 @@
 import "dotenv/config";
+import bcrypt from "bcryptjs";
+
 import { PrismaClient } from "../src/generated/prisma/client";
 
 const prisma = new PrismaClient();
 
+/** Comptes de démonstration — voir README pour les identifiants de test. */
+const DEMO_USERS = [
+  {
+    id: "seed-user-dispatcher",
+    email: "dispatcher@pharmaroute.be",
+    name: "Isabelle (Dispatcher)",
+    password: "dispatcher123",
+    role: "DISPATCHER" as const,
+  },
+  {
+    id: "seed-user-driver",
+    email: "chauffeur@pharmaroute.be",
+    name: "Jean (Chauffeur)",
+    password: "chauffeur123",
+    role: "DRIVER" as const,
+  },
+];
+
 async function main() {
+  for (const demoUser of DEMO_USERS) {
+    const passwordHash = await bcrypt.hash(demoUser.password, 10);
+    await prisma.user.upsert({
+      where: { email: demoUser.email },
+      update: { name: demoUser.name, role: demoUser.role, passwordHash },
+      create: {
+        id: demoUser.id,
+        email: demoUser.email,
+        name: demoUser.name,
+        role: demoUser.role,
+        passwordHash,
+      },
+    });
+  }
+
   const depot = await prisma.depot.upsert({
     where: { id: "seed-depot-bruxelles" },
     update: {},
@@ -103,6 +138,7 @@ async function main() {
   }
 
   console.log(`✔ Dépôt "${depot.name}" et ${pharmacies.length} pharmacies insérés.`);
+  console.log(`✔ ${DEMO_USERS.length} comptes de démonstration créés (voir README).`);
 }
 
 main()

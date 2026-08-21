@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Play, Truck } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,25 +17,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { SolverProviderId } from "@/lib/solver/types";
+
+interface SolverAvailabilityEntry {
+  configured: boolean;
+  hint: string;
+}
 
 interface OptimizeFormProps {
   defaultDepartureTime: string;
   pharmacyCount: number;
   suggestedVehicleCount: number;
   disabled?: boolean;
+  solverAvailability: Record<SolverProviderId, SolverAvailabilityEntry>;
 }
+
+const SOLVER_OPTIONS: { id: SolverProviderId; label: string }[] = [
+  { id: "INTERNAL", label: "Simulation interne PharmaRoute FX" },
+  { id: "OPENROUTE_VROOM", label: "OpenRouteService / VROOM (trajets routiers réels)" },
+  { id: "GOOGLE_ROUTE_OPTIMIZATION", label: "Google Route Optimization" },
+];
 
 export function OptimizeForm({
   defaultDepartureTime,
   pharmacyCount,
   suggestedVehicleCount,
   disabled = false,
+  solverAvailability,
 }: OptimizeFormProps) {
   const router = useRouter();
   const [vehicleCount, setVehicleCount] = React.useState(String(suggestedVehicleCount));
   const [departureTime, setDepartureTime] = React.useState(defaultDepartureTime);
-  const [solverProvider, setSolverProvider] = React.useState("INTERNAL");
+  const [solverProvider, setSolverProvider] = React.useState<SolverProviderId>("INTERNAL");
   const [loading, setLoading] = React.useState(false);
+
+  const selectedHint = solverAvailability[solverProvider]?.hint;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,7 +74,13 @@ export function OptimizeForm({
         return;
       }
 
-      toast.success("Tournées calculées avec succès");
+      if (json.unassignedCount > 0) {
+        toast.warning(
+          `Tournées calculées, mais ${json.unassignedCount} pharmacie(s) n'ont pas pu être intégrées dans une tournée respectant leur fenêtre horaire.`
+        );
+      } else {
+        toast.success("Tournées calculées avec succès");
+      }
       router.push(`/results/${json.optimizationId}`);
     } catch {
       toast.error("Erreur réseau, veuillez réessayer");
@@ -108,29 +131,49 @@ export function OptimizeForm({
 
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <Label>Moteur d&apos;optimisation (solver VRPTW)</Label>
-            <Select value={solverProvider} onValueChange={setSolverProvider} disabled={disabled}>
+            <Select
+              value={solverProvider}
+              onValueChange={(v) => setSolverProvider(v as SolverProviderId)}
+              disabled={disabled}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="INTERNAL">Simulation interne PharmaRoute FX</SelectItem>
-                <SelectItem value="GOOGLE_ROUTE_OPTIMIZATION" disabled>
-                  Google Route Optimization API (bientôt — clé API requise)
-                </SelectItem>
-                <SelectItem value="OPENROUTE_VROOM" disabled>
-                  OpenRouteService / VROOM (bientôt — endpoint requis)
-                </SelectItem>
+                {SOLVER_OPTIONS.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    <span className="flex items-center gap-2">
+                      {option.label}
+                      {solverAvailability[option.id]?.configured ? (
+                        option.id !== "INTERNAL" && (
+                          <Badge variant="success" className="text-[10px]">
+                            Configuré
+                          </Badge>
+                        )
+                      ) : (
+                        <Badge variant="outline" className="text-[10px]">
+                          Non configuré
+                        </Badge>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              L&apos;interface est prête pour un solver externe ; en attendant sa configuration
-              (voir <code className="font-mono">.env.example</code>), le calcul utilise la
-              simulation interne (balayage angulaire + plus proche voisin + 2-opt).
+              {solverAvailability[solverProvider]?.configured
+                ? solverProvider === "INTERNAL"
+                  ? "Distances simulées (Haversine + facteur de circuité), aucune configuration requise."
+                  : "Configuré : ce calcul utilisera des trajets routiers réels."
+                : selectedHint}
             </p>
           </div>
 
           <div className="sm:col-span-2">
-            <Button type="submit" disabled={disabled || loading}>
+            <Button
+              type="submit"
+              disabled={disabled || loading || !solverAvailability[solverProvider]?.configured}
+            >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
