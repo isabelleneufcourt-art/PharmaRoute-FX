@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  /* Bleu pharmaceutique */
+  --primary: 217 91% 40%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+
+  --accent: 210 40% 94%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 210 40% 98%;
+
+  /* Vert validation (fenêtre horaire respectée) */
+  --success: 142 71% 35%;
+  --success-foreground: 210 40% 98%;
+
+  /* Orange alerte (fenêtre horaire non respectée) */
+  --warning: 32 95% 44%;
+  --warning-foreground: 210 40% 98%;
+
+  --border: 214 32% 89%;
+  --input: 214 32% 89%;
+  --ring: 217 91% 40%;
+
+  --radius: 0.6rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 44% 11%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 44% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 213 94% 62%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 60% 40%;
+    --success-foreground: 210 40% 98%;
+
+    --warning: 32 90% 50%;
+    --warning-foreground: 222 47% 11%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 213 94% 62%;
+  }
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Leaflet : s'assurer que la carte prend bien la hauteur de son conteneur */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: hsl(var(--muted));
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Feuille de route imprimable */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}

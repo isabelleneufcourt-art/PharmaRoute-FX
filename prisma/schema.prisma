@@ -1,0 +1,161 @@
+// PharmaRoute FX — Schéma de base de données
+// Outil d'optimisation de tournées VRPTW pour grossistes-répartiteurs (Belgique)
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Dépôt central (point de départ / retour des tournées)
+model Depot {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  postalCode  String
+  city        String
+  latitude    Float?
+  longitude   Float?
+  /// Heure d'ouverture du dépôt / heure de départ par défaut, format "HH:mm"
+  openingTime String   @default("06:30")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  optimizations Optimization[]
+
+  @@map("depots")
+}
+
+/// Pharmacie cliente (point de livraison)
+model Pharmacy {
+  id        String  @id @default(cuid())
+  /// Code APB (Association Pharmaceutique Belge) — identifiant officiel de l'officine
+  apbCode   String  @unique
+  name      String
+  address   String
+  /// Code postal belge à 4 chiffres
+  postalCode String
+  city      String
+  latitude  Float?
+  longitude Float?
+
+  /// Début de la fenêtre de livraison autorisée, format "HH:mm"
+  timeWindowStart String @default("08:00")
+  /// Fin de la fenêtre de livraison autorisée, format "HH:mm"
+  timeWindowEnd   String @default("18:00")
+
+  /// Nombre de bacs/caisses à livrer pour cette pharmacie
+  bacsCount Int @default(1)
+
+  /// Temps de déchargement fixe sur place, en minutes
+  serviceTimeMinutes Int @default(5)
+
+  contactName  String?
+  contactPhone String?
+  notes        String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stops RouteStop[]
+
+  @@map("pharmacies")
+}
+
+enum OptimizationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+/// Fournisseur de solver VRPTW utilisé pour le calcul
+enum SolverProvider {
+  INTERNAL
+  GOOGLE_ROUTE_OPTIMIZATION
+  OPENROUTE_VROOM
+}
+
+/// Un lancement d'optimisation (= un ensemble de tournées calculées à un instant T)
+model Optimization {
+  id     String @id @default(cuid())
+  depotId String
+  depot   Depot  @relation(fields: [depotId], references: [id])
+
+  /// Nombre de véhicules disponibles pour cette optimisation
+  vehicleCount Int
+  /// Heure de départ du dépôt, format "HH:mm"
+  departureTime String
+
+  status         OptimizationStatus @default(PENDING)
+  solverProvider SolverProvider     @default(INTERNAL)
+
+  totalDistanceKm  Float?
+  totalDurationMin Int?
+  /// Nombre d'arrêts dont la fenêtre horaire n'a pas été respectée
+  violationsCount  Int?
+  errorMessage     String?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  routes Route[]
+
+  @@map("optimizations")
+}
+
+/// Une tournée assignée à un véhicule au sein d'une optimisation
+model Route {
+  id             String @id @default(cuid())
+  optimizationId String
+  optimization   Optimization @relation(fields: [optimizationId], references: [id], onDelete: Cascade)
+
+  /// Ex: "Véhicule 1"
+  vehicleLabel String
+  vehicleIndex Int
+
+  totalDistanceKm  Float?
+  totalDurationMin Int?
+  /// Géométrie de l'itinéraire (GeoJSON / liste de coordonnées sérialisée en JSON)
+  geometry         String?
+  /// Couleur d'affichage sur la carte (hex)
+  colorHex         String  @default("#2563eb")
+
+  stops RouteStop[]
+
+  @@map("routes")
+}
+
+/// Un arrêt (livraison pharmacie) au sein d'une tournée, dans l'ordre de passage
+model RouteStop {
+  id String @id @default(cuid())
+
+  routeId String
+  route   Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  pharmacyId String
+  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  /// Position dans la séquence de la tournée (1 = premier arrêt après le dépôt)
+  sequence Int
+
+  /// Heure estimée d'arrivée, format "HH:mm"
+  etaArrival String
+  /// Heure estimée de départ (arrivée + temps de déchargement), format "HH:mm"
+  etaDeparture String
+
+  /// La fenêtre horaire de la pharmacie est-elle respectée ?
+  withinTimeWindow Boolean @default(true)
+
+  distanceFromPrevKm  Float?
+  durationFromPrevMin Int?
+
+  @@map("route_stops")
+}
