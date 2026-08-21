@@ -66,6 +66,10 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
   const [timeWindows, setTimeWindows] = React.useState<WeeklyWindowsInput>(
     pharmacy ? rowsToWeeklyWindows(pharmacy.timeWindows) : defaultWeeklyWindows()
   );
+  const [earlyAccessEnabled, setEarlyAccessEnabled] = React.useState(
+    pharmacy?.earlyAccessEnabled ?? false
+  );
+  const [earlyAccessTime, setEarlyAccessTime] = React.useState(pharmacy?.earlyAccessTime ?? "07:30");
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -80,7 +84,12 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
       const res = await fetch(isEdit ? `/api/pharmacies/${pharmacy!.id}` : "/api/pharmacies", {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, timeWindows }),
+        body: JSON.stringify({
+          ...form,
+          timeWindows,
+          earlyAccessEnabled,
+          earlyAccessTime: earlyAccessEnabled ? earlyAccessTime : null,
+        }),
       });
       const json = await res.json();
 
@@ -189,6 +198,38 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
               onChange={setTimeWindows}
               error={errors.timeWindows}
             />
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-md border border-border p-3 sm:col-span-2">
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 rounded border-input accent-primary"
+                checked={earlyAccessEnabled}
+                onChange={(e) => setEarlyAccessEnabled(e.target.checked)}
+              />
+              Livraison hors-horaires (Sas / Clé)
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Si un sas de dépôt ou une clé est confié(e) au chauffeur, indiquez l&apos;heure
+              d&apos;accès autorisée : le solver pourra planifier une arrivée avant
+              l&apos;ouverture officielle de l&apos;officine (grille ci-dessus, inchangée).
+            </p>
+            {earlyAccessEnabled && (
+              <div className="flex flex-col gap-1.5 sm:max-w-[220px]">
+                <Label htmlFor="earlyAccessTime">Accès chauffeur autorisé dès</Label>
+                <Input
+                  id="earlyAccessTime"
+                  type="time"
+                  value={earlyAccessTime}
+                  onChange={(e) => setEarlyAccessTime(e.target.value)}
+                  required
+                />
+                {errors.earlyAccessTime && (
+                  <p className="text-xs text-destructive">{errors.earlyAccessTime}</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

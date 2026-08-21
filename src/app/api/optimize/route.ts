@@ -9,6 +9,41 @@ import { minutesToTime, parseTimeToMinutes } from "@/lib/time";
 import { optimizeRequestSchema } from "@/lib/validations";
 import { getWeekdayFromDate, parseDateOnly } from "@/lib/weekday";
 
+interface PharmacyForTimeWindows {
+  earlyAccessEnabled: boolean;
+  earlyAccessTime: string | null;
+  timeWindows: { startTime: string; endTime: string; period: SolverTimeWindow["period"] }[];
+}
+
+/**
+ * Construit les créneaux ouverts d'une pharmacie pour le jour ciblé, triés par heure
+ * de début. Si la livraison hors-horaires (sas/clé) est activée, l'heure de début du
+ * tout premier créneau du jour est abaissée jusqu'à l'heure d'accès chauffeur — le
+ * solver peut alors planifier une arrivée avant l'ouverture officielle de l'officine,
+ * sans que celle-ci ne soit modifiée sur la fiche pharmacie.
+ */
+function buildStopTimeWindows(pharmacy: PharmacyForTimeWindows): SolverTimeWindow[] {
+  const windows = pharmacy.timeWindows
+    .map(
+      (w): SolverTimeWindow => ({
+        startMinutes: parseTimeToMinutes(w.startTime),
+        endMinutes: parseTimeToMinutes(w.endTime),
+        period: w.period,
+      })
+    )
+    .sort((a, b) => a.startMinutes - b.startMinutes);
+
+  if (pharmacy.earlyAccessEnabled && pharmacy.earlyAccessTime && windows.length > 0) {
+    const earlyAccessMinutes = parseTimeToMinutes(pharmacy.earlyAccessTime);
+    windows[0] = {
+      ...windows[0],
+      startMinutes: Math.min(windows[0].startMinutes, earlyAccessMinutes),
+    };
+  }
+
+  return windows;
+}
+
 export async function POST(request: NextRequest) {
   let optimizationId: string | null = null;
 
@@ -124,15 +159,7 @@ export async function POST(request: NextRequest) {
         demand: pharmacy.bacsCount,
         serviceTimeMinutes: pharmacy.serviceTimeMinutes,
         // Créneaux ouverts ce jour-là (matin et/ou après-midi), triés par heure de début.
-        timeWindows: pharmacy.timeWindows
-          .map(
-            (w): SolverTimeWindow => ({
-              startMinutes: parseTimeToMinutes(w.startTime),
-              endMinutes: parseTimeToMinutes(w.endTime),
-              period: w.period,
-            })
-          )
-          .sort((a, b) => a.startMinutes - b.startMinutes),
+        timeWindows: buildStopTimeWindows(pharmacy),
       })),
       vehicleCount,
       departureTimeMinutes: parseTimeToMinutes(departureTime),

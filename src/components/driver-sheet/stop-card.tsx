@@ -1,7 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, Clock, Minus, Package, Phone, Plus, StickyNote } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  KeyRound,
+  Minus,
+  Package,
+  Phone,
+  Plus,
+  StickyNote,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +38,8 @@ export interface StopCardData {
     contactName: string | null;
     contactPhone: string | null;
     notes: string | null;
+    earlyAccessEnabled: boolean;
+    earlyAccessTime: string | null;
   };
 }
 
@@ -39,6 +51,10 @@ interface StopCardProps {
 
 export function StopCard({ stop, color, onUpdate }: StopCardProps) {
   const [bacsInput, setBacsInput] = React.useState(String(stop.emptyBacsRetrieved));
+  const usesEarlyAccess =
+    stop.pharmacy.earlyAccessEnabled &&
+    stop.pharmacy.earlyAccessTime &&
+    stop.scheduledWindowStart === stop.pharmacy.earlyAccessTime;
 
   React.useEffect(() => {
     setBacsInput(String(stop.emptyBacsRetrieved));
@@ -105,6 +121,12 @@ export function StopCard({ stop, color, onUpdate }: StopCardProps) {
             <span className="font-sans">({DELIVERY_PERIOD_LABELS[stop.deliveryPeriod]})</span>
           )}
         </span>
+        {usesEarlyAccess && (
+          <span className="inline-flex items-center gap-1 font-medium text-primary">
+            <KeyRound className="h-3 w-3" />
+            Accès sas/clé — livraison possible avant l&apos;ouverture officielle
+          </span>
+        )}
         <span>ETA {stop.etaArrival}</span>
         <span className="inline-flex items-center gap-1">
           <Package className="h-3 w-3" />

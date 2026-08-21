@@ -88,7 +88,8 @@ chaque carte de tournée.
 - `Pharmacy` — client de livraison : code APB, adresse belge (CP à 4
   chiffres), grille horaire hebdomadaire (`PharmacyTimeWindow[]`, voir
   ci-dessous), nombre de bacs, temps de déchargement fixe
-  (`serviceTimeMinutes`, 5 min par défaut).
+  (`serviceTimeMinutes`, 5 min par défaut), livraison hors-horaires optionnelle
+  (`earlyAccessEnabled` + `earlyAccessTime`, voir ci-dessous).
 - `PharmacyTimeWindow` — un créneau d'ouverture pour une pharmacie donnée :
   `weekday` (`MONDAY`…`SATURDAY`), `period` (`MORNING`/`AFTERNOON`),
   `startTime`/`endTime` (`HH:mm`). Une pharmacie peut avoir jusqu'à 2
@@ -127,6 +128,31 @@ lancement :
   comme référence principale sur les écrans Résultats, Historique, Mes
   tournées et la feuille de route ; l'heure de calcul reste visible en
   information secondaire sur l'écran Résultats détaillé.
+
+## Livraison hors-horaires (Sas / Clé)
+
+Certaines pharmacies confient un sas de dépôt ou une clé au chauffeur, ce qui
+permet une livraison avant l'heure d'ouverture officielle de l'officine.
+Plutôt que de modifier la grille horaire réelle (qui reste affichée telle
+quelle sur la fiche pharmacie), ce paramètre est dédié et indépendant :
+
+- Dans le formulaire pharmacie, cochez **"Livraison hors-horaires (Sas /
+  Clé)"** et indiquez l'heure d'accès chauffeur autorisée (ex. `07:30`),
+  strictement antérieure à l'heure d'ouverture la plus tôt de la semaine
+  (ex. `08:30`).
+- Au calcul, le solver utilise cette heure comme début possible du tout
+  premier créneau du jour, à la place de l'heure d'ouverture officielle — le
+  véhicule n'a donc plus à patienter jusqu'à l'ouverture, ce qui peut réduire
+  le temps d'attente et donc la durée totale des tournées.
+- La grille horaire de la pharmacie (fiche, import CSV) reste inchangée et
+  continue d'afficher les horaires réels d'ouverture ; seul le calcul du
+  solver en tient compte différemment.
+- Sur les écrans Résultats et la feuille de route chauffeur, un badge
+  "🔑 Sas" apparaît à côté du créneau retenu lorsque l'accès anticipé a
+  effectivement été utilisé pour planifier l'arrêt.
+- Colonne CSV dédiée : **"Heure acces chauffeur (Sas/Cle)"** — une valeur
+  `HH:mm` active automatiquement l'accès anticipé pour la ligne ; une cellule
+  vide le laisse désactivé.
 
 ## Sélection des pharmacies à inclure
 

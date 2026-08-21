@@ -35,6 +35,19 @@ const FIELD_ALIASES: Record<FlatField, string[]> = {
   contactName: ["contact", "nom_contact", "contact_name", "responsable"],
   contactPhone: ["telephone", "tel", "phone", "contact_phone", "gsm"],
   notes: ["notes", "remarques", "commentaire", "commentaires"],
+  // "earlyAccessEnabled" est dérivé automatiquement de la présence de "earlyAccessTime"
+  // (voir mapRawRowToPharmacyInput ci-dessous) : aucun alias de colonne dédié.
+  earlyAccessEnabled: [],
+  earlyAccessTime: [
+    "heure_acces_chauffeur",
+    "acces_chauffeur",
+    "heure_acces",
+    "acces_anticipe",
+    "heure_sas",
+    "sas",
+    "heure_cle",
+    "cle",
+  ],
 };
 
 /** Alias reconnus pour chaque colonne "jour" de la grille hebdomadaire. */
@@ -158,6 +171,10 @@ function mapRawRowToPharmacyInput(
     if (match && match[1] !== "") candidate[field] = match[1];
   }
 
+  // "earlyAccessEnabled" est dérivé : une colonne "Heure accès chauffeur" renseignée
+  // active automatiquement la livraison hors-horaires (sas/clé) pour cette ligne.
+  candidate.earlyAccessEnabled = typeof candidate.earlyAccessTime === "string";
+
   const errors: string[] = [];
   const weekly: Partial<Record<WeekdayId, DayWindowsInput>> = {};
   let anyDayColumnFound = false;
@@ -237,6 +254,7 @@ export const CSV_TEMPLATE_HEADERS = [
   "Jeudi",
   "Vendredi",
   "Samedi",
+  "Heure acces chauffeur (Sas/Cle)",
   "Nombre de bacs",
   "Temps dechargement",
   "Contact",
@@ -256,6 +274,7 @@ export const CSV_TEMPLATE_EXAMPLE_ROW = [
   "08:30-12:30;14:00-18:30",
   "08:30-12:30;14:00-18:30",
   "09:00-12:30",
+  "07:30",
   "3",
   "5",
   "J. Dupont",

@@ -94,6 +94,15 @@ model Pharmacy {
   contactPhone String?
   notes        String?
 
+  /// Livraison hors-horaires possible (sas de dépôt / clé confiée au chauffeur) :
+  /// le chauffeur peut accéder au point de dépôt avant l'heure d'ouverture
+  /// officielle de l'officine, sans que celle-ci (grille horaire ci-dessous,
+  /// affichée telle quelle sur la fiche pharmacie) ne soit modifiée.
+  earlyAccessEnabled Boolean @default(false)
+  /// Heure la plus tôt à laquelle le chauffeur peut effectuer le dépôt (sas/clé),
+  /// format "HH:mm" — utilisée par le solver comme horaire d'accès anticipé.
+  earlyAccessTime String?
+
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

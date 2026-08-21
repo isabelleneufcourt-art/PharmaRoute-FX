@@ -91,6 +91,16 @@ export const pharmacySchema = z
       .regex(belgianPostalCodeRegex, "Code postal belge invalide (4 chiffres)"),
     city: z.string().trim().min(2, "La ville est requise"),
     timeWindows: weeklyWindowsSchema,
+    /** Livraison hors-horaires (sas de dépôt / clé confiée au chauffeur) : indique au
+     *  solver qu'un accès anticipé est possible, sans modifier l'horaire réel de
+     *  l'officine (grille `timeWindows` ci-dessus, inchangée). */
+    earlyAccessEnabled: z.boolean().default(false),
+    earlyAccessTime: z
+      .string()
+      .trim()
+      .regex(timeRegex, "Heure d'accès invalide (HH:mm)")
+      .nullable()
+      .default(null),
     bacsCount: z.coerce.number().int().min(1, "Au moins 1 bac").max(999),
     serviceTimeMinutes: z.coerce.number().int().min(0).max(180).default(5),
     contactName: z.string().trim().optional().or(z.literal("")),
@@ -101,7 +111,29 @@ export const pharmacySchema = z
   .refine((data) => WEEKDAYS.some((day) => data.timeWindows[day].morning || data.timeWindows[day].afternoon), {
     message: "Au moins un créneau doit être ouvert dans la semaine",
     path: ["timeWindows"],
-  });
+  })
+  .refine((data) => !data.earlyAccessEnabled || Boolean(data.earlyAccessTime), {
+    message: "Indiquez l'heure d'accès chauffeur (sas/clé)",
+    path: ["earlyAccessTime"],
+  })
+  .refine(
+    (data) => {
+      if (!data.earlyAccessEnabled || !data.earlyAccessTime) return true;
+      const earliestOpening = WEEKDAYS.flatMap((day) => [
+        data.timeWindows[day].morning,
+        data.timeWindows[day].afternoon,
+      ])
+        .filter((w): w is TimePeriodInput => w !== null)
+        .map((w) => w.start)
+        .sort()[0];
+      if (!earliestOpening) return true;
+      return data.earlyAccessTime < earliestOpening;
+    },
+    {
+      message: "L'heure d'accès chauffeur doit précéder l'heure d'ouverture la plus tôt de la semaine",
+      path: ["earlyAccessTime"],
+    }
+  );
 
 export type PharmacyInput = z.infer<typeof pharmacySchema>;
 

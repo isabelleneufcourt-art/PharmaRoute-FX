@@ -3,7 +3,16 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Package, Printer, User } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  KeyRound,
+  Package,
+  Printer,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,11 +36,20 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDurationMinutes } from "@/lib/time";
 import { DELIVERY_PERIOD_LABELS } from "@/lib/weekday";
-import type { DriverOption, RouteWithStops } from "@/types";
+import type { DriverOption, RouteStopWithPharmacy, RouteWithStops } from "@/types";
 
 interface RouteListPanelProps {
   routes: RouteWithStops[];
   drivers: DriverOption[];
+}
+
+/** Cet arrêt est-il planifié via l'accès anticipé (sas/clé) plutôt que l'ouverture officielle ? */
+function usesEarlyAccess(stop: RouteStopWithPharmacy): boolean {
+  return Boolean(
+    stop.pharmacy.earlyAccessEnabled &&
+      stop.pharmacy.earlyAccessTime &&
+      stop.scheduledWindowStart === stop.pharmacy.earlyAccessTime
+  );
 }
 
 export function RouteListPanel({ routes, drivers }: RouteListPanelProps) {
@@ -184,6 +202,15 @@ function RouteCard({ route, drivers }: { route: RouteWithStops; drivers: DriverO
                     {stop.deliveryPeriod && (
                       <span className="ml-1 font-sans text-[10px]">
                         ({DELIVERY_PERIOD_LABELS[stop.deliveryPeriod]})
+                      </span>
+                    )}
+                    {usesEarlyAccess(stop) && (
+                      <span
+                        className="ml-1 inline-flex items-center gap-0.5 font-sans text-[10px] text-primary"
+                        title={`Accès anticipé sas/clé — ouverture officielle de l'officine à ${stop.pharmacy.name}`}
+                      >
+                        <KeyRound className="h-2.5 w-2.5" />
+                        Sas
                       </span>
                     )}
                   </TableCell>

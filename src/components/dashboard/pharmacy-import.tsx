@@ -147,7 +147,8 @@ export function PharmacyImport() {
           <CardTitle>Import des pharmacies clientes</CardTitle>
           <CardDescription>
             Fichier CSV ou Excel : code APB, nom, adresse belge, CP, ville, grille horaire
-            Lundi-Samedi (matin/après-midi), nombre de bacs.
+            Lundi-Samedi (matin/après-midi), heure d&apos;accès chauffeur (sas/clé) optionnelle,
+            nombre de bacs.
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
@@ -248,6 +249,11 @@ export function PharmacyImport() {
                           </TableCell>
                           <TableCell className="font-mono text-xs">
                             {row.data ? `${countOpenSlots(row.data.timeWindows)} créneaux/sem.` : "—"}
+                            {row.data?.earlyAccessEnabled && row.data.earlyAccessTime && (
+                              <span className="ml-1 font-sans text-muted-foreground">
+                                · Sas {row.data.earlyAccessTime}
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell>{row.data?.bacsCount ?? "—"}</TableCell>
                           <TableCell>

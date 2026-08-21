@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, MapPin, Search, Trash2 } from "lucide-react";
+import { Boxes, KeyRound, MapPin, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import type { PharmacyWithTimeWindows } from "@/types";
@@ -150,7 +150,19 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
                     {pharmacy.address}, {pharmacy.postalCode} {pharmacy.city}
                   </TableCell>
                   <TableCell>
-                    <WeeklyWindowsSummary pharmacy={pharmacy} />
+                    <div className="flex flex-col items-start gap-1">
+                      <WeeklyWindowsSummary pharmacy={pharmacy} />
+                      {pharmacy.earlyAccessEnabled && pharmacy.earlyAccessTime && (
+                        <Badge
+                          variant="secondary"
+                          title={`Livraison hors-horaires : accès chauffeur dès ${pharmacy.earlyAccessTime} (sas/clé)`}
+                          className="text-[10px]"
+                        >
+                          <KeyRound className="h-3 w-3" />
+                          Sas {pharmacy.earlyAccessTime}
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">
