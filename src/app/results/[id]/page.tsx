@@ -70,8 +70,17 @@ export default async function ResultsDetailPage({ params }: { params: { id: stri
           <div>
             <p className="text-sm font-semibold">{optimization.depot.name}</p>
             <p className="text-xs text-muted-foreground">
-              Départ {optimization.departureTime} —{" "}
-              {new Date(optimization.createdAt).toLocaleString("fr-BE")}
+              Livraison du{" "}
+              {new Date(optimization.deliveryDate).toLocaleDateString("fr-BE", {
+                weekday: "long",
+                day: "2-digit",
+                month: "long",
+                timeZone: "UTC",
+              })}{" "}
+              — Départ {optimization.departureTime}{" "}
+              <span className="opacity-70">
+                (calculé le {new Date(optimization.createdAt).toLocaleString("fr-BE")})
+              </span>
             </p>
           </div>
         </div>

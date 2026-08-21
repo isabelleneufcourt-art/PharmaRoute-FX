@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2, Clock, Minus, Package, Phone, Plus, Sticky
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { DELIVERY_PERIOD_LABELS } from "@/lib/weekday";
 
 export interface StopCardData {
   id: string;
@@ -13,6 +14,9 @@ export interface StopCardData {
   etaArrival: string;
   etaDeparture: string;
   withinTimeWindow: boolean;
+  deliveryPeriod: "MORNING" | "AFTERNOON" | null;
+  scheduledWindowStart: string | null;
+  scheduledWindowEnd: string | null;
   completed: boolean;
   emptyBacsRetrieved: number;
   pharmacy: {
@@ -20,8 +24,6 @@ export interface StopCardData {
     address: string;
     postalCode: string;
     city: string;
-    timeWindowStart: string;
-    timeWindowEnd: string;
     bacsCount: number;
     contactName: string | null;
     contactPhone: string | null;
@@ -98,7 +100,10 @@ export function StopCard({ stop, color, onUpdate }: StopCardProps) {
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1 font-mono">
           <Clock className="h-3 w-3" />
-          {stop.pharmacy.timeWindowStart}–{stop.pharmacy.timeWindowEnd}
+          {stop.scheduledWindowStart}–{stop.scheduledWindowEnd}
+          {stop.deliveryPeriod && (
+            <span className="font-sans">({DELIVERY_PERIOD_LABELS[stop.deliveryPeriod]})</span>
+          )}
         </span>
         <span>ETA {stop.etaArrival}</span>
         <span className="inline-flex items-center gap-1">

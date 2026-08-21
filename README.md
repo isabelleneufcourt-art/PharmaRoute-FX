@@ -48,10 +48,12 @@ vers `/login`.
 ## Écrans
 
 1. **Dépôt & Pharmacies** (`/`) — gestion du dépôt central, import CSV/Excel
-   des pharmacies clientes (code APB, adresse belge, fenêtres horaires,
-   bacs), liste avec recherche/édition/suppression. *Dispatcher uniquement.*
-2. **Optimisation** (`/optimize`) — formulaire de lancement (véhicules, heure
-   de départ, choix du solver VRPTW). *Dispatcher uniquement.*
+   des pharmacies clientes (code APB, adresse belge, grille horaire
+   hebdomadaire, bacs), liste avec recherche/édition/suppression.
+   *Dispatcher uniquement.*
+2. **Optimisation** (`/optimize`) — formulaire de lancement (véhicules, date
+   de livraison, heure de départ, choix du solver VRPTW). *Dispatcher
+   uniquement.*
 3. **Résultats** (`/results`, `/results/[id]`) — vue split-screen : tournées
    avec ETA/respect de créneau à gauche, carte Leaflet à droite ; assignation
    d'un chauffeur par tournée. *Dispatcher uniquement.*
@@ -84,24 +86,70 @@ chaque carte de tournée.
   `DRIVER`.
 - `Depot` — point de départ/retour des tournées.
 - `Pharmacy` — client de livraison : code APB, adresse belge (CP à 4
-  chiffres), fenêtre horaire (`timeWindowStart`/`timeWindowEnd`), nombre de
-  bacs, temps de déchargement fixe (`serviceTimeMinutes`, 5 min par défaut).
-- `Optimization` / `Route` / `RouteStop` — résultat d'un calcul VRPTW : une
-  optimisation regroupe plusieurs tournées (véhicules, éventuellement
-  assignées à un `User` chauffeur), chacune composée d'arrêts ordonnés avec
-  ETA calculée, indicateur de respect de créneau, et suivi terrain
-  (`completed`, `emptyBacsRetrieved`).
+  chiffres), grille horaire hebdomadaire (`PharmacyTimeWindow[]`, voir
+  ci-dessous), nombre de bacs, temps de déchargement fixe
+  (`serviceTimeMinutes`, 5 min par défaut).
+- `PharmacyTimeWindow` — un créneau d'ouverture pour une pharmacie donnée :
+  `weekday` (`MONDAY`…`SATURDAY`), `period` (`MORNING`/`AFTERNOON`),
+  `startTime`/`endTime` (`HH:mm`). Une pharmacie peut avoir jusqu'à 2
+  créneaux par jour (matin + après-midi), sur 6 jours (pas de dimanche) —
+  soit jusqu'à 12 lignes par pharmacie. Un jour sans créneau = pharmacie
+  fermée ce jour-là.
+- `Optimization` / `Route` / `RouteStop` — résultat d'un calcul VRPTW pour
+  une `deliveryDate` donnée : une optimisation regroupe plusieurs tournées
+  (véhicules, éventuellement assignées à un `User` chauffeur), chacune
+  composée d'arrêts ordonnés avec ETA calculée, créneau retenu
+  (`deliveryPeriod`, `scheduledWindowStart`/`End`), indicateur de respect de
+  créneau, et suivi terrain (`completed`, `emptyBacsRetrieved`).
+
+## Grille horaire hebdomadaire & optimisation par date
+
+Chaque pharmacie a sa propre grille Lundi→Samedi, avec jusqu'à 2 créneaux par
+jour (Matin et Après-midi, ex. `08:30-12:30` / `14:00-18:30`). Elle se
+configure ligne par ligne dans le formulaire pharmacie (`/`), via un tableau
+à cocher : cocher "Livraison possible" pour un jour/période fait apparaître
+les champs heure de début/fin.
+
+L'écran Optimisation (`/optimize`) demande désormais une **date de
+livraison** (en plus de l'heure de départ et du nombre de véhicules). Au
+lancement :
+
+- Le jour de la semaine est déduit de la date choisie (dimanche = date
+  refusée, aucune tournée n'étant livrée ce jour-là).
+- Seules les pharmacies ayant au moins un créneau ouvert ce jour précis sont
+  incluses dans le calcul ; les autres sont exclues et comptabilisées
+  (message "X pharmacie(s) fermée(s) ce jour-là" affiché après le calcul).
+- Le solver (interne ou externe) choisit automatiquement, pour chaque arrêt,
+  le meilleur créneau du jour (matin si l'arrivée prévue tombe dedans ou
+  avant, après-midi sinon) — visible sur l'écran Résultats et la feuille de
+  route chauffeur (ex. "14:00–18:30 (Après-midi)").
+- La date de livraison choisie (pas la date/heure de calcul) est affichée
+  comme référence principale sur les écrans Résultats, Historique, Mes
+  tournées et la feuille de route ; l'heure de calcul reste visible en
+  information secondaire sur l'écran Résultats détaillé.
 
 ## Import CSV/Excel des pharmacies
 
 Le formulaire d'import (`/`) accepte `.csv`, `.xlsx`, `.xls`. Les en-têtes de
 colonnes sont reconnus de façon flexible (accents/majuscules ignorés, alias
 français courants : `Code APB`, `Nom`, `Adresse`, `CP`, `Ville`,
-`Heure Debut`, `Heure Fin`, `Nombre de bacs`…). Un modèle CSV téléchargeable
-est disponible dans l'écran d'import. Chaque ligne est validée individuellement
-(code postal belge à 4 chiffres, horaires `HH:mm`, cohérence début < fin) et
-un ré-import met à jour les pharmacies existantes (upsert par code APB) au
-lieu de créer des doublons.
+`Nombre de bacs`…). Un modèle CSV téléchargeable est disponible dans l'écran
+d'import. Chaque ligne est validée individuellement (code postal belge à 4
+chiffres, cohérence début < fin par créneau) et un ré-import met à jour les
+pharmacies existantes (upsert par code APB) au lieu de créer des doublons.
+
+**Colonnes horaires** : une colonne par jour (`Lundi`, `Mardi`, `Mercredi`,
+`Jeudi`, `Vendredi`, `Samedi`), chaque cellule contenant 0, 1 ou 2 créneaux
+au format `HH:mm-HH:mm`, séparés par `;` si deux créneaux :
+
+- Cellule vide → pharmacie fermée ce jour-là.
+- Un seul créneau (ex. `08:30-12:30`) → affecté automatiquement au matin ou
+  à l'après-midi selon son heure de début.
+- Deux créneaux (ex. `08:30-12:30;14:00-18:30`) → matin puis après-midi.
+
+Pour compatibilité avec d'anciens fichiers, les alias `Heure Debut`/
+`Heure Fin` (un seul créneau, appliqué à tous les jours Lundi-Samedi) restent
+acceptés si aucune colonne journalière n'est présente dans le fichier.
 
 ## Solver VRPTW — simulation interne vs trajets routiers réels
 

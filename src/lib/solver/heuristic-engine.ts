@@ -16,6 +16,7 @@ import type {
   SolverStop,
   SolverStopResult,
 } from "./types";
+import { resolveDeliveryWindow } from "./window-matching";
 
 export interface EnginePoint {
   lat: number;
@@ -131,9 +132,8 @@ function simulateTimeline(
   const stops: SolverStopResult[] = order.map((stop, index) => {
     const { distanceKm, durationMin } = dist(currentLocation, stop);
     const arrival = currentTime + durationMin;
-    // Le camion attend si nécessaire jusqu'à l'ouverture de la fenêtre.
-    const serviceStart = Math.max(arrival, stop.timeWindowStart);
-    const withinTimeWindow = arrival <= stop.timeWindowEnd;
+    // Le camion attend si nécessaire jusqu'à l'ouverture du créneau retenu.
+    const { serviceStart, withinTimeWindow, matched } = resolveDeliveryWindow(arrival, stop.timeWindows);
     const departure = serviceStart + stop.serviceTimeMinutes;
 
     totalDistance += distanceKm;
@@ -148,6 +148,9 @@ function simulateTimeline(
       etaArrivalMinutes: Math.round(serviceStart),
       etaDepartureMinutes: Math.round(departure),
       withinTimeWindow,
+      matchedPeriod: matched.period,
+      matchedWindowStartMinutes: matched.startMinutes,
+      matchedWindowEndMinutes: matched.endMinutes,
       distanceFromPrevKm: round2(distanceKm),
       durationFromPrevMin: Math.round(durationMin),
     };

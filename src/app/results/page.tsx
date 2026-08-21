@@ -50,15 +50,12 @@ export default async function ResultsIndexPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium">
-                      {new Date(opt.createdAt).toLocaleDateString("fr-BE", {
+                      Livraison du{" "}
+                      {new Date(opt.deliveryDate).toLocaleDateString("fr-BE", {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",
-                      })}{" "}
-                      —{" "}
-                      {new Date(opt.createdAt).toLocaleTimeString("fr-BE", {
-                        hour: "2-digit",
-                        minute: "2-digit",
+                        timeZone: "UTC",
                       })}
                     </CardTitle>
                     {opt.status === "COMPLETED" && (
@@ -69,7 +66,13 @@ export default async function ResultsIndexPage() {
                       <Clock className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>
-                  <CardDescription>{opt.depot.name}</CardDescription>
+                  <CardDescription>
+                    {opt.depot.name} — calculé à{" "}
+                    {new Date(opt.createdAt).toLocaleTimeString("fr-BE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap items-center gap-2 text-xs">
                   <Badge variant="outline">

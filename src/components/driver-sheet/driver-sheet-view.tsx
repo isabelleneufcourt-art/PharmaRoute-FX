@@ -48,7 +48,7 @@ export function DriverSheetView({ route }: DriverSheetViewProps) {
     }
   }
 
-  const createdAt = new Date(route.optimization.createdAt);
+  const deliveryDate = new Date(route.optimization.deliveryDate);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 print:max-w-full print:px-0 print:py-0">
@@ -71,7 +71,13 @@ export function DriverSheetView({ route }: DriverSheetViewProps) {
           <h1 className="text-xl font-bold">Feuille de route — {route.vehicleLabel}</h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {createdAt.toLocaleDateString("fr-BE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}{" "}
+          {deliveryDate.toLocaleDateString("fr-BE", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+            timeZone: "UTC",
+          })}{" "}
           — Départ {route.optimization.departureTime}
         </p>
 

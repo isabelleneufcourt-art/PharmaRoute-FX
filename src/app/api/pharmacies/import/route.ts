@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 
+import { weeklyWindowsToRows } from "@/lib/pharmacy-windows";
 import { prisma } from "@/lib/prisma";
 import { pharmacySchema } from "@/lib/validations";
 
@@ -11,7 +12,7 @@ const importBodySchema = z.object({
 /**
  * Import en masse (CSV/Excel déjà parsé côté client).
  * Fait un upsert par code APB : un ré-import met à jour les pharmacies existantes
- * au lieu de créer des doublons.
+ * (et remplace intégralement leur grille horaire) au lieu de créer des doublons.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -22,12 +23,13 @@ export async function POST(request: NextRequest) {
     let updated = 0;
 
     await prisma.$transaction(async (tx) => {
-      for (const data of pharmacies) {
+      for (const { timeWindows, ...data } of pharmacies) {
         const existing = await tx.pharmacy.findUnique({ where: { apbCode: data.apbCode } });
+        const rows = weeklyWindowsToRows(timeWindows);
         await tx.pharmacy.upsert({
           where: { apbCode: data.apbCode },
-          create: data,
-          update: data,
+          create: { ...data, timeWindows: { create: rows } },
+          update: { ...data, timeWindows: { deleteMany: {}, create: rows } },
         });
         if (existing) updated += 1;
         else created += 1;

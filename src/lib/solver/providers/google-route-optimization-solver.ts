@@ -15,6 +15,7 @@
 import { roadDistanceKm, travelTimeMinutes } from "../geometry";
 import { decodePolyline, isPlausibleRouteGeometry } from "../polyline";
 import type { SolverInput, SolverResult, SolverRouteResult, SolverStopResult, VrptwSolver } from "../types";
+import { resolveDeliveryWindow } from "../window-matching";
 import { getGoogleAccessToken, parseServiceAccount, type GoogleServiceAccount } from "./google-auth";
 
 interface OptimizeToursVisit {
@@ -92,12 +93,11 @@ export const googleRouteOptimizationSolver: VrptwSolver = {
         {
           arrivalLocation: { latitude: stop.lat, longitude: stop.lng },
           duration: `${Math.round(stop.serviceTimeMinutes * 60)}s`,
-          timeWindows: [
-            {
-              startTime: minutesToIsoToday(stop.timeWindowStart),
-              endTime: minutesToIsoToday(stop.timeWindowEnd),
-            },
-          ],
+          // L'API accepte plusieurs fenêtres par visite : matin et/ou après-midi du jour ciblé.
+          timeWindows: stop.timeWindows.map((w) => ({
+            startTime: minutesToIsoToday(w.startMinutes),
+            endTime: minutesToIsoToday(w.endMinutes),
+          })),
         },
       ],
     }));
@@ -141,8 +141,8 @@ export const googleRouteOptimizationSolver: VrptwSolver = {
       const stopResults: SolverStopResult[] = (route.visits ?? []).map((visit, index) => {
         const stop = stops[visit.shipmentIndex];
         const arrivalMinutes = isoToMinutesToday(visit.startTime);
+        const { withinTimeWindow, matched } = resolveDeliveryWindow(arrivalMinutes, stop.timeWindows);
         const departureMinutes = arrivalMinutes + stop.serviceTimeMinutes;
-        const withinTimeWindow = arrivalMinutes <= stop.timeWindowEnd + 1e-6;
         if (!withinTimeWindow) violationsCount += 1;
 
         // L'API ne détaille pas la distance/durée par segment : on l'estime
@@ -158,6 +158,9 @@ export const googleRouteOptimizationSolver: VrptwSolver = {
           etaArrivalMinutes: Math.round(arrivalMinutes),
           etaDepartureMinutes: Math.round(departureMinutes),
           withinTimeWindow,
+          matchedPeriod: matched.period,
+          matchedWindowStartMinutes: matched.startMinutes,
+          matchedWindowEndMinutes: matched.endMinutes,
           distanceFromPrevKm: round2(legDistanceKm),
           durationFromPrevMin: Math.round(legDurationMin),
         };

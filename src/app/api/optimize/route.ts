@@ -4,15 +4,27 @@ import { ZodError } from "zod";
 import { approximateBelgianCoordinates } from "@/lib/geo/belgian-geocode";
 import { prisma } from "@/lib/prisma";
 import { getRouteColor, getSolver } from "@/lib/solver";
+import type { SolverTimeWindow } from "@/lib/solver/types";
 import { minutesToTime, parseTimeToMinutes } from "@/lib/time";
 import { optimizeRequestSchema } from "@/lib/validations";
+import { getWeekdayFromDate, parseDateOnly } from "@/lib/weekday";
 
 export async function POST(request: NextRequest) {
   let optimizationId: string | null = null;
 
   try {
     const body = await request.json();
-    const { vehicleCount, departureTime, solverProvider } = optimizeRequestSchema.parse(body);
+    const { vehicleCount, departureTime, deliveryDate, solverProvider } =
+      optimizeRequestSchema.parse(body);
+
+    const deliveryDateObj = parseDateOnly(deliveryDate);
+    const weekday = getWeekdayFromDate(deliveryDateObj);
+    if (!weekday) {
+      return NextResponse.json(
+        { error: "Aucune livraison n'est programmée le dimanche — choisissez un autre jour" },
+        { status: 400 }
+      );
+    }
 
     const depot = await prisma.depot.findFirst({ where: { isActive: true } });
     if (!depot) {
@@ -22,10 +34,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const pharmacies = await prisma.pharmacy.findMany({ where: { isActive: true } });
-    if (pharmacies.length === 0) {
+    const allPharmacies = await prisma.pharmacy.findMany({
+      where: { isActive: true },
+      include: { timeWindows: { where: { weekday } } },
+    });
+    if (allPharmacies.length === 0) {
       return NextResponse.json(
         { error: "Importez au moins une pharmacie avant de lancer une optimisation" },
+        { status: 400 }
+      );
+    }
+
+    // Seules les pharmacies ayant au moins un créneau ouvert ce jour-là participent
+    // à l'optimisation ; les autres sont simplement absentes de cette tournée.
+    const pharmacies = allPharmacies.filter((p) => p.timeWindows.length > 0);
+    const excludedCount = allPharmacies.length - pharmacies.length;
+    if (pharmacies.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Aucune pharmacie n'a de créneau ouvert ce jour-là. Vérifiez la grille horaire des pharmacies ou choisissez une autre date.",
+        },
         { status: 400 }
       );
     }
@@ -58,6 +87,7 @@ export async function POST(request: NextRequest) {
         return prisma.pharmacy.update({
           where: { id: pharmacy.id },
           data: { latitude: approx.lat, longitude: approx.lng },
+          include: { timeWindows: { where: { weekday } } },
         });
       })
     );
@@ -67,6 +97,7 @@ export async function POST(request: NextRequest) {
         depotId: depot.id,
         vehicleCount,
         departureTime,
+        deliveryDate: deliveryDateObj,
         solverProvider,
         status: "RUNNING",
       },
@@ -81,8 +112,16 @@ export async function POST(request: NextRequest) {
         lng: pharmacy.longitude as number,
         demand: pharmacy.bacsCount,
         serviceTimeMinutes: pharmacy.serviceTimeMinutes,
-        timeWindowStart: parseTimeToMinutes(pharmacy.timeWindowStart),
-        timeWindowEnd: parseTimeToMinutes(pharmacy.timeWindowEnd),
+        // Créneaux ouverts ce jour-là (matin et/ou après-midi), triés par heure de début.
+        timeWindows: pharmacy.timeWindows
+          .map(
+            (w): SolverTimeWindow => ({
+              startMinutes: parseTimeToMinutes(w.startTime),
+              endMinutes: parseTimeToMinutes(w.endTime),
+              period: w.period,
+            })
+          )
+          .sort((a, b) => a.startMinutes - b.startMinutes),
       })),
       vehicleCount,
       departureTimeMinutes: parseTimeToMinutes(departureTime),
@@ -111,6 +150,9 @@ export async function POST(request: NextRequest) {
               etaArrival: minutesToTime(stop.etaArrivalMinutes),
               etaDeparture: minutesToTime(stop.etaDepartureMinutes),
               withinTimeWindow: stop.withinTimeWindow,
+              deliveryPeriod: stop.matchedPeriod,
+              scheduledWindowStart: minutesToTime(stop.matchedWindowStartMinutes),
+              scheduledWindowEnd: minutesToTime(stop.matchedWindowEndMinutes),
               distanceFromPrevKm: stop.distanceFromPrevKm,
               durationFromPrevMin: stop.durationFromPrevMin,
             },
@@ -134,6 +176,7 @@ export async function POST(request: NextRequest) {
       {
         optimizationId: optimization.id,
         unassignedCount: result.unassignedPharmacyIds?.length ?? 0,
+        excludedCount,
       },
       { status: 201 }
     );

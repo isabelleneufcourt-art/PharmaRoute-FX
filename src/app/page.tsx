@@ -9,7 +9,10 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const [depot, pharmacies] = await Promise.all([
     prisma.depot.findFirst({ where: { isActive: true }, orderBy: { createdAt: "asc" } }),
-    prisma.pharmacy.findMany({ orderBy: [{ postalCode: "asc" }, { name: "asc" }] }),
+    prisma.pharmacy.findMany({
+      orderBy: [{ postalCode: "asc" }, { name: "asc" }],
+      include: { timeWindows: true },
+    }),
   ]);
 
   return (

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { weeklyWindowsToRows } from "@/lib/pharmacy-windows";
 import { prisma } from "@/lib/prisma";
 import { pharmacySchema } from "@/lib/validations";
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await request.json();
-    const data = pharmacySchema.parse(body);
+    const { timeWindows, ...data } = pharmacySchema.parse(body);
 
     const conflict = await prisma.pharmacy.findFirst({
       where: { apbCode: data.apbCode, NOT: { id: params.id } },
@@ -19,7 +20,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       );
     }
 
-    const pharmacy = await prisma.pharmacy.update({ where: { id: params.id }, data });
+    // La grille horaire complète est toujours resoumise par le formulaire :
+    // on remplace simplement toutes les lignes existantes.
+    const pharmacy = await prisma.$transaction(async (tx) => {
+      await tx.pharmacyTimeWindow.deleteMany({ where: { pharmacyId: params.id } });
+      return tx.pharmacy.update({
+        where: { id: params.id },
+        data: { ...data, timeWindows: { create: weeklyWindowsToRows(timeWindows) } },
+        include: { timeWindows: true },
+      });
+    });
+
     return NextResponse.json({ pharmacy });
   } catch (error) {
     if (error instanceof ZodError) {

@@ -13,6 +13,15 @@ export interface SolverDepot {
   lng: number;
 }
 
+export type DeliveryPeriodId = "MORNING" | "AFTERNOON";
+
+/** Un créneau de livraison ouvert (ex: le créneau "Matin" du jour ciblé), en minutes depuis minuit. */
+export interface SolverTimeWindow {
+  startMinutes: number;
+  endMinutes: number;
+  period: DeliveryPeriodId;
+}
+
 export interface SolverStop {
   pharmacyId: string;
   lat: number;
@@ -21,9 +30,12 @@ export interface SolverStop {
   demand: number;
   /** Temps de déchargement fixe sur place, en minutes. */
   serviceTimeMinutes: number;
-  /** Fenêtre horaire de livraison autorisée, en minutes depuis minuit. */
-  timeWindowStart: number;
-  timeWindowEnd: number;
+  /**
+   * Créneaux ouverts pour le jour de livraison ciblé (1 ou 2 : matin et/ou
+   * après-midi), triés par heure de début croissante. Toujours non vide —
+   * une pharmacie fermée ce jour-là est exclue de l'optimisation en amont.
+   */
+  timeWindows: SolverTimeWindow[];
 }
 
 export interface SolverInput {
@@ -42,8 +54,13 @@ export interface SolverStopResult {
   sequence: number;
   etaArrivalMinutes: number;
   etaDepartureMinutes: number;
-  /** La livraison a-t-elle lieu dans la fenêtre horaire de la pharmacie ? */
+  /** La livraison a-t-elle lieu dans l'un des créneaux ouverts ce jour-là ? */
   withinTimeWindow: boolean;
+  /** Créneau (matin/après-midi) retenu pour cette livraison. */
+  matchedPeriod: DeliveryPeriodId;
+  /** Bornes du créneau retenu, en minutes depuis minuit (pour affichage/snapshot). */
+  matchedWindowStartMinutes: number;
+  matchedWindowEndMinutes: number;
   distanceFromPrevKm: number;
   durationFromPrevMin: number;
 }

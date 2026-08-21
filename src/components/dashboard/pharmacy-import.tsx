@@ -30,8 +30,18 @@ import {
   readSpreadsheetFile,
   type ParsedPharmacyRow,
 } from "@/lib/import/parse-pharmacies";
+import type { PharmacyInput } from "@/lib/validations";
+import { WEEKDAYS } from "@/lib/weekday";
 
 const MAX_PREVIEW_ROWS = 200;
+
+/** Nombre de créneaux ouverts dans la semaine (sur 12 possibles : 6 jours × 2 créneaux). */
+function countOpenSlots(timeWindows: PharmacyInput["timeWindows"]): number {
+  return WEEKDAYS.reduce((sum, day) => {
+    const d = timeWindows[day];
+    return sum + (d.morning ? 1 : 0) + (d.afternoon ? 1 : 0);
+  }, 0);
+}
 
 export function PharmacyImport() {
   const router = useRouter();
@@ -136,8 +146,8 @@ export function PharmacyImport() {
         <div>
           <CardTitle>Import des pharmacies clientes</CardTitle>
           <CardDescription>
-            Fichier CSV ou Excel : code APB, nom, adresse belge, CP, ville, fenêtres horaires,
-            nombre de bacs.
+            Fichier CSV ou Excel : code APB, nom, adresse belge, CP, ville, grille horaire
+            Lundi-Samedi (matin/après-midi), nombre de bacs.
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
@@ -216,7 +226,7 @@ export function PharmacyImport() {
                         <TableHead>Code APB</TableHead>
                         <TableHead>Nom</TableHead>
                         <TableHead>CP / Ville</TableHead>
-                        <TableHead>Créneau</TableHead>
+                        <TableHead>Grille horaire</TableHead>
                         <TableHead>Bacs</TableHead>
                         <TableHead>Statut</TableHead>
                       </TableRow>
@@ -237,9 +247,7 @@ export function PharmacyImport() {
                               : "—"}
                           </TableCell>
                           <TableCell className="font-mono text-xs">
-                            {row.data
-                              ? `${row.data.timeWindowStart}–${row.data.timeWindowEnd}`
-                              : "—"}
+                            {row.data ? `${countOpenSlots(row.data.timeWindows)} créneaux/sem.` : "—"}
                           </TableCell>
                           <TableCell>{row.data?.bacsCount ?? "—"}</TableCell>
                           <TableCell>

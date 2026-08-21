@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { formatDurationMinutes } from "@/lib/time";
+import { DELIVERY_PERIOD_LABELS } from "@/lib/weekday";
 import type { DriverOption, RouteWithStops } from "@/types";
 
 interface RouteListPanelProps {
@@ -179,7 +180,12 @@ function RouteCard({ route, drivers }: { route: RouteWithStops; drivers: DriverO
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     <Clock className="mb-0.5 mr-1 inline h-3 w-3" />
-                    {stop.pharmacy.timeWindowStart}–{stop.pharmacy.timeWindowEnd}
+                    {stop.scheduledWindowStart}–{stop.scheduledWindowEnd}
+                    {stop.deliveryPeriod && (
+                      <span className="ml-1 font-sans text-[10px]">
+                        ({DELIVERY_PERIOD_LABELS[stop.deliveryPeriod]})
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono text-xs">{stop.etaArrival}</TableCell>
                   <TableCell>

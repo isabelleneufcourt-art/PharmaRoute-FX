@@ -12,6 +12,7 @@
 
 import { decodePolyline, isPlausibleRouteGeometry } from "../polyline";
 import type { SolverInput, SolverResult, SolverRouteResult, SolverStopResult } from "../types";
+import { resolveDeliveryWindow } from "../window-matching";
 
 interface VroomStep {
   type: "start" | "end" | "job" | "pickup" | "delivery" | "break";
@@ -55,7 +56,11 @@ export async function solveWithVroom(input: SolverInput, vroomUrl: string): Prom
       id: jobId,
       location: [stop.lng, stop.lat],
       service: Math.round(stop.serviceTimeMinutes * 60),
-      time_windows: [[Math.round(stop.timeWindowStart * 60), Math.round(stop.timeWindowEnd * 60)]],
+      // VROOM accepte nativement plusieurs créneaux par arrêt : matin et/ou après-midi du jour ciblé.
+      time_windows: stop.timeWindows.map((w) => [
+        Math.round(w.startMinutes * 60),
+        Math.round(w.endMinutes * 60),
+      ]),
     };
   });
 
@@ -113,8 +118,10 @@ export async function solveWithVroom(input: SolverInput, vroomUrl: string): Prom
 
       sequence += 1;
       const arrivalMinutes = (step.arrival ?? 0) / 60;
+      // VROOM a déjà choisi/validé un créneau en amont (contrainte stricte) ; on retrouve
+      // ici lequel (matin/après-midi) pour l'affichage, avec la même logique que l'heuristique interne.
+      const { withinTimeWindow, matched } = resolveDeliveryWindow(arrivalMinutes, stopInput.timeWindows);
       const departureMinutes = arrivalMinutes + stopInput.serviceTimeMinutes;
-      const withinTimeWindow = (step.arrival ?? 0) <= stopInput.timeWindowEnd * 60;
       const distanceKm = ((step.distance ?? prevDistance) - prevDistance) / 1000;
       const durationMin = ((step.duration ?? prevDuration) - prevDuration) / 60;
 
@@ -126,6 +133,9 @@ export async function solveWithVroom(input: SolverInput, vroomUrl: string): Prom
         etaArrivalMinutes: Math.round(arrivalMinutes),
         etaDepartureMinutes: Math.round(departureMinutes),
         withinTimeWindow,
+        matchedPeriod: matched.period,
+        matchedWindowStartMinutes: matched.startMinutes,
+        matchedWindowEndMinutes: matched.endMinutes,
         distanceFromPrevKm: round2(distanceKm),
         durationFromPrevMin: Math.round(durationMin),
       });

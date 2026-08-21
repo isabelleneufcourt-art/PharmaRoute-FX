@@ -55,6 +55,22 @@ model Depot {
   @@map("depots")
 }
 
+/// Jour de la semaine où une livraison est envisageable (marché belge : pas de tournée le dimanche)
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+/// Créneau du jour
+enum DeliveryPeriod {
+  MORNING
+  AFTERNOON
+}
+
 /// Pharmacie cliente (point de livraison)
 model Pharmacy {
   id        String  @id @default(cuid())
@@ -67,11 +83,6 @@ model Pharmacy {
   city      String
   latitude  Float?
   longitude Float?
-
-  /// Début de la fenêtre de livraison autorisée, format "HH:mm"
-  timeWindowStart String @default("08:00")
-  /// Fin de la fenêtre de livraison autorisée, format "HH:mm"
-  timeWindowEnd   String @default("18:00")
 
   /// Nombre de bacs/caisses à livrer pour cette pharmacie
   bacsCount Int @default(1)
@@ -87,9 +98,31 @@ model Pharmacy {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  stops RouteStop[]
+  /// Grille hebdomadaire des créneaux de livraison (Lundi-Samedi, Matin/Après-midi).
+  /// L'absence de ligne pour un (jour, créneau) donné signifie "fermé" à ce moment-là.
+  timeWindows PharmacyTimeWindow[]
+  stops       RouteStop[]
 
   @@map("pharmacies")
+}
+
+/// Un créneau de livraison ouvert pour une pharmacie, un jour de la semaine donné.
+model PharmacyTimeWindow {
+  id String @id @default(cuid())
+
+  pharmacyId String
+  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  weekday Weekday
+  period  DeliveryPeriod
+
+  /// Début du créneau, format "HH:mm" (ex: "08:30")
+  startTime String
+  /// Fin du créneau, format "HH:mm" (ex: "12:30")
+  endTime   String
+
+  @@unique([pharmacyId, weekday, period])
+  @@map("pharmacy_time_windows")
 }
 
 enum OptimizationStatus {
@@ -116,6 +149,10 @@ model Optimization {
   vehicleCount Int
   /// Heure de départ du dépôt, format "HH:mm"
   departureTime String
+  /// Date de livraison ciblée — détermine le jour de la semaine utilisé pour
+  /// sélectionner les créneaux horaires (matin/après-midi) de chaque pharmacie.
+  /// (défaut = date de création, pour compatibilité avec les optimisations existantes)
+  deliveryDate DateTime @default(now())
 
   status         OptimizationStatus @default(PENDING)
   solverProvider SolverProvider     @default(INTERNAL)
@@ -181,6 +218,12 @@ model RouteStop {
 
   /// La fenêtre horaire de la pharmacie est-elle respectée ?
   withinTimeWindow Boolean @default(true)
+  /// Créneau (matin/après-midi) retenu pour cette livraison, parmi ceux ouverts ce jour-là
+  deliveryPeriod DeliveryPeriod?
+  /// Copie du créneau appliqué au moment du calcul, format "HH:mm" (indépendant
+  /// d'une modification ultérieure de la grille horaire de la pharmacie)
+  scheduledWindowStart String?
+  scheduledWindowEnd   String?
 
   distanceFromPrevKm  Float?
   durationFromPrevMin Int?

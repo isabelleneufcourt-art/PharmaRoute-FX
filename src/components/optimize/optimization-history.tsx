@@ -9,6 +9,7 @@ interface OptimizationHistoryItem {
   id: string;
   status: string;
   createdAt: Date;
+  deliveryDate: Date;
   vehicleCount: number;
   totalDistanceKm: number | null;
   totalDurationMin: number | null;
@@ -48,7 +49,14 @@ export function OptimizationHistory({ optimizations }: OptimizationHistoryProps)
               {opt.status !== "COMPLETED" && opt.status !== "FAILED" && (
                 <Clock className="h-4 w-4 text-muted-foreground" />
               )}
-              <span>{new Date(opt.createdAt).toLocaleString("fr-BE")}</span>
+              <span>
+                {new Date(opt.deliveryDate).toLocaleDateString("fr-BE", {
+                  weekday: "short",
+                  day: "2-digit",
+                  month: "short",
+                  timeZone: "UTC",
+                })}
+              </span>
               <Badge variant="outline">
                 {opt.vehicleCount} véhicule{opt.vehicleCount > 1 ? "s" : ""}
               </Badge>

@@ -1,10 +1,15 @@
 import { z } from "zod";
 
+import { WEEKDAYS } from "@/lib/weekday";
+
 /** Code postal belge : 4 chiffres, ne commence pas par 0 (ex: 1000 Bruxelles, 4000 Liège). */
 export const belgianPostalCodeRegex = /^[1-9][0-9]{3}$/;
 
 /** Heure au format HH:mm (24h). */
 export const timeRegex = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+/** Date au format YYYY-MM-DD (issue d'un `<input type="date">`). */
+export const dateOnlyRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 export const depotSchema = z
   .object({
@@ -24,6 +29,57 @@ export const depotSchema = z
 
 export type DepotInput = z.infer<typeof depotSchema>;
 
+/** Un créneau horaire (ex: 08:30-12:30), avec cohérence début < fin. */
+const timePeriodSchema = z
+  .object({
+    start: z.string().trim().regex(timeRegex, "Heure de début invalide (HH:mm)"),
+    end: z.string().trim().regex(timeRegex, "Heure de fin invalide (HH:mm)"),
+  })
+  .strict()
+  .refine((d) => d.start < d.end, {
+    message: "L'heure de début doit précéder l'heure de fin",
+    path: ["end"],
+  });
+
+export type TimePeriodInput = z.infer<typeof timePeriodSchema>;
+
+/** Créneaux Matin / Après-midi d'un même jour ; `null` = fermé (pas de livraison ce créneau). */
+const dayWindowsSchema = z
+  .object({
+    morning: timePeriodSchema.nullable(),
+    afternoon: timePeriodSchema.nullable(),
+  })
+  .strict();
+
+export type DayWindowsInput = z.infer<typeof dayWindowsSchema>;
+
+/** Grille hebdomadaire complète (Lundi → Samedi) des créneaux de livraison d'une pharmacie. */
+export const weeklyWindowsSchema = z
+  .object({
+    MONDAY: dayWindowsSchema,
+    TUESDAY: dayWindowsSchema,
+    WEDNESDAY: dayWindowsSchema,
+    THURSDAY: dayWindowsSchema,
+    FRIDAY: dayWindowsSchema,
+    SATURDAY: dayWindowsSchema,
+  })
+  .strict();
+
+export type WeeklyWindowsInput = z.infer<typeof weeklyWindowsSchema>;
+
+/** Grille par défaut proposée à la création : Lundi-Vendredi 08:30-12:30 / 14:00-18:30, Samedi fermé. */
+export function defaultWeeklyWindows(): WeeklyWindowsInput {
+  const weekday = { morning: { start: "08:30", end: "12:30" }, afternoon: { start: "14:00", end: "18:30" } };
+  return {
+    MONDAY: weekday,
+    TUESDAY: weekday,
+    WEDNESDAY: weekday,
+    THURSDAY: weekday,
+    FRIDAY: weekday,
+    SATURDAY: { morning: null, afternoon: null },
+  };
+}
+
 export const pharmacySchema = z
   .object({
     apbCode: z.string().trim().min(1, "Le code APB est requis"),
@@ -34,8 +90,7 @@ export const pharmacySchema = z
       .trim()
       .regex(belgianPostalCodeRegex, "Code postal belge invalide (4 chiffres)"),
     city: z.string().trim().min(2, "La ville est requise"),
-    timeWindowStart: z.string().trim().regex(timeRegex, "Heure de début invalide (HH:mm)"),
-    timeWindowEnd: z.string().trim().regex(timeRegex, "Heure de fin invalide (HH:mm)"),
+    timeWindows: weeklyWindowsSchema,
     bacsCount: z.coerce.number().int().min(1, "Au moins 1 bac").max(999),
     serviceTimeMinutes: z.coerce.number().int().min(0).max(180).default(5),
     contactName: z.string().trim().optional().or(z.literal("")),
@@ -43,9 +98,9 @@ export const pharmacySchema = z
     notes: z.string().trim().optional().or(z.literal("")),
   })
   .strict()
-  .refine((data) => data.timeWindowStart < data.timeWindowEnd, {
-    message: "L'heure de début doit précéder l'heure de fin",
-    path: ["timeWindowEnd"],
+  .refine((data) => WEEKDAYS.some((day) => data.timeWindows[day].morning || data.timeWindows[day].afternoon), {
+    message: "Au moins un créneau doit être ouvert dans la semaine",
+    path: ["timeWindows"],
   });
 
 export type PharmacyInput = z.infer<typeof pharmacySchema>;
@@ -57,6 +112,7 @@ export const optimizeRequestSchema = z
   .object({
     vehicleCount: z.coerce.number().int().min(1, "Au moins 1 véhicule").max(50),
     departureTime: z.string().trim().regex(timeRegex, "Heure de départ invalide (HH:mm)"),
+    deliveryDate: z.string().trim().regex(dateOnlyRegex, "Date de livraison invalide"),
     solverProvider: z
       .enum(["INTERNAL", "GOOGLE_ROUTE_OPTIMIZATION", "OPENROUTE_VROOM"])
       .default("INTERNAL"),

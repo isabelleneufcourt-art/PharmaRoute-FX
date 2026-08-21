@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, Clock, MapPin, Search, Trash2 } from "lucide-react";
+import { Boxes, MapPin, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import type { Pharmacy } from "@/types";
+import type { PharmacyWithTimeWindows } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,9 +19,51 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PharmacyFormDialog } from "@/components/dashboard/pharmacy-form-dialog";
+import { cn } from "@/lib/utils";
+import { DELIVERY_PERIOD_LABELS, WEEKDAY_LABELS, WEEKDAY_SHORT_LABELS, WEEKDAYS } from "@/lib/weekday";
 
 interface PharmacyListProps {
-  pharmacies: Pharmacy[];
+  pharmacies: PharmacyWithTimeWindows[];
+}
+
+/** Résumé compact de la grille hebdomadaire : un badge par jour, plein si un créneau est ouvert. */
+function WeeklyWindowsSummary({ pharmacy }: { pharmacy: PharmacyWithTimeWindows }) {
+  const byDay = React.useMemo(() => {
+    const map = new Map<string, typeof pharmacy.timeWindows>();
+    for (const day of WEEKDAYS) map.set(day, []);
+    for (const window of pharmacy.timeWindows) {
+      map.get(window.weekday)?.push(window);
+    }
+    return map;
+  }, [pharmacy]);
+
+  return (
+    <div className="flex gap-1">
+      {WEEKDAYS.map((day) => {
+        const windows = byDay.get(day) ?? [];
+        const isOpen = windows.length > 0;
+        const title = isOpen
+          ? `${WEEKDAY_LABELS[day]} : ${windows
+              .map((w) => `${DELIVERY_PERIOD_LABELS[w.period]} ${w.startTime}-${w.endTime}`)
+              .join(" · ")}`
+          : `${WEEKDAY_LABELS[day]} : fermé`;
+        return (
+          <span
+            key={day}
+            title={title}
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded text-[10px] font-medium",
+              isOpen
+                ? "bg-primary/15 text-primary"
+                : "bg-muted text-muted-foreground/50 line-through"
+            )}
+          >
+            {WEEKDAY_SHORT_LABELS[day][0]}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 export function PharmacyList({ pharmacies }: PharmacyListProps) {
@@ -39,7 +81,7 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
     );
   }, [pharmacies, query]);
 
-  async function handleDelete(pharmacy: Pharmacy) {
+  async function handleDelete(pharmacy: PharmacyWithTimeWindows) {
     if (!confirm(`Supprimer la pharmacie "${pharmacy.name}" (${pharmacy.apbCode}) ?`)) return;
 
     setDeletingId(pharmacy.id);
@@ -92,7 +134,7 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
                 <TableHead>Code APB</TableHead>
                 <TableHead>Pharmacie</TableHead>
                 <TableHead>Adresse</TableHead>
-                <TableHead>Créneau</TableHead>
+                <TableHead>Grille (Lun→Sam)</TableHead>
                 <TableHead>Bacs</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -108,10 +150,7 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
                     {pharmacy.address}, {pharmacy.postalCode} {pharmacy.city}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="font-mono">
-                      <Clock className="h-3 w-3" />
-                      {pharmacy.timeWindowStart}–{pharmacy.timeWindowEnd}
-                    </Badge>
+                    <WeeklyWindowsSummary pharmacy={pharmacy} />
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">

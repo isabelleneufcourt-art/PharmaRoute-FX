@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-import type { Pharmacy } from "@/types";
+import type { PharmacyWithTimeWindows } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,9 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { WeeklyWindowsEditor } from "@/components/dashboard/weekly-windows-editor";
+import { rowsToWeeklyWindows } from "@/lib/pharmacy-windows";
+import { defaultWeeklyWindows, type WeeklyWindowsInput } from "@/lib/validations";
 
 interface PharmacyFormDialogProps {
-  pharmacy?: Pharmacy;
+  pharmacy?: PharmacyWithTimeWindows;
   /** Rendu personnalisé du déclencheur (sinon un bouton par défaut est utilisé). */
   trigger?: React.ReactNode;
 }
@@ -31,8 +34,6 @@ const emptyForm = {
   address: "",
   postalCode: "",
   city: "",
-  timeWindowStart: "08:00",
-  timeWindowEnd: "18:00",
   bacsCount: "1",
   serviceTimeMinutes: "5",
   contactName: "",
@@ -54,8 +55,6 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
           address: pharmacy.address,
           postalCode: pharmacy.postalCode,
           city: pharmacy.city,
-          timeWindowStart: pharmacy.timeWindowStart,
-          timeWindowEnd: pharmacy.timeWindowEnd,
           bacsCount: String(pharmacy.bacsCount),
           serviceTimeMinutes: String(pharmacy.serviceTimeMinutes),
           contactName: pharmacy.contactName ?? "",
@@ -63,6 +62,9 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
           notes: pharmacy.notes ?? "",
         }
       : emptyForm
+  );
+  const [timeWindows, setTimeWindows] = React.useState<WeeklyWindowsInput>(
+    pharmacy ? rowsToWeeklyWindows(pharmacy.timeWindows) : defaultWeeklyWindows()
   );
 
   function update<K extends keyof typeof form>(key: K, value: string) {
@@ -78,7 +80,7 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
       const res = await fetch(isEdit ? `/api/pharmacies/${pharmacy!.id}` : "/api/pharmacies", {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, timeWindows }),
       });
       const json = await res.json();
 
@@ -112,11 +114,11 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Modifier la pharmacie" : "Nouvelle pharmacie"}</DialogTitle>
           <DialogDescription>
-            Code APB, adresse belge, fenêtre horaire de livraison et nombre de bacs.
+            Code APB, adresse belge, grille horaire hebdomadaire et nombre de bacs.
           </DialogDescription>
         </DialogHeader>
 
@@ -180,32 +182,13 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
             {errors.city && <p className="text-xs text-destructive">{errors.city}</p>}
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="timeWindowStart">Créneau — début</Label>
-            <Input
-              id="timeWindowStart"
-              type="time"
-              value={form.timeWindowStart}
-              onChange={(e) => update("timeWindowStart", e.target.value)}
-              required
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label>Grille horaire de livraison (Lundi → Samedi)</Label>
+            <WeeklyWindowsEditor
+              value={timeWindows}
+              onChange={setTimeWindows}
+              error={errors.timeWindows}
             />
-            {errors.timeWindowStart && (
-              <p className="text-xs text-destructive">{errors.timeWindowStart}</p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="timeWindowEnd">Créneau — fin</Label>
-            <Input
-              id="timeWindowEnd"
-              type="time"
-              value={form.timeWindowEnd}
-              onChange={(e) => update("timeWindowEnd", e.target.value)}
-              required
-            />
-            {errors.timeWindowEnd && (
-              <p className="text-xs text-destructive">{errors.timeWindowEnd}</p>
-            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

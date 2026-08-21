@@ -1,9 +1,12 @@
-import type { Depot, Pharmacy, Prisma, User } from "@/generated/prisma/client";
+import type { Depot, Pharmacy, PharmacyTimeWindow, Prisma, User } from "@/generated/prisma/client";
 
-export type { Depot, Pharmacy, User };
+export type { Depot, Pharmacy, PharmacyTimeWindow, User };
 
 /** Utilisateur chauffeur, tel qu'exposé au dispatcher pour l'assignation de tournées. */
 export type DriverOption = Pick<User, "id" | "name" | "email">;
+
+/** Pharmacie avec sa grille hebdomadaire complète de créneaux (Lundi-Samedi). */
+export type PharmacyWithTimeWindows = Pharmacy & { timeWindows: PharmacyTimeWindow[] };
 
 export type OptimizationWithRoutes = Prisma.OptimizationGetPayload<{
   include: {

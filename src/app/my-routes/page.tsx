@@ -15,7 +15,7 @@ export default async function MyRoutesPage() {
 
   const routes = await prisma.route.findMany({
     where: { driverId: session.user.id },
-    orderBy: { optimization: { createdAt: "desc" } },
+    orderBy: { optimization: { deliveryDate: "desc" } },
     include: { optimization: { include: { depot: true } }, stops: true },
     take: 20,
   });
@@ -57,7 +57,12 @@ export default async function MyRoutesPage() {
                     <CardDescription className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
                       {route.optimization.depot.name} —{" "}
-                      {new Date(route.optimization.createdAt).toLocaleDateString("fr-BE")}
+                      {new Date(route.optimization.deliveryDate).toLocaleDateString("fr-BE", {
+                        weekday: "long",
+                        day: "2-digit",
+                        month: "long",
+                        timeZone: "UTC",
+                      })}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-wrap items-center gap-2 text-xs">

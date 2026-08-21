@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { SolverProviderId } from "@/lib/solver/types";
+import { cn } from "@/lib/utils";
+import { WEEKDAY_LABELS, formatDateOnly, getWeekdayFromDate, parseDateOnly } from "@/lib/weekday";
 
 interface SolverAvailabilityEntry {
   configured: boolean;
@@ -48,10 +50,13 @@ export function OptimizeForm({
   const router = useRouter();
   const [vehicleCount, setVehicleCount] = React.useState(String(suggestedVehicleCount));
   const [departureTime, setDepartureTime] = React.useState(defaultDepartureTime);
+  const [deliveryDate, setDeliveryDate] = React.useState(() => formatDateOnly(new Date()));
   const [solverProvider, setSolverProvider] = React.useState<SolverProviderId>("INTERNAL");
   const [loading, setLoading] = React.useState(false);
 
   const selectedHint = solverAvailability[solverProvider]?.hint;
+  const weekday = deliveryDate ? getWeekdayFromDate(parseDateOnly(deliveryDate)) : null;
+  const isSunday = deliveryDate !== "" && weekday === null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,6 +69,7 @@ export function OptimizeForm({
         body: JSON.stringify({
           vehicleCount: Number(vehicleCount),
           departureTime,
+          deliveryDate,
           solverProvider,
         }),
       });
@@ -74,6 +80,11 @@ export function OptimizeForm({
         return;
       }
 
+      if (json.excludedCount > 0) {
+        toast.warning(
+          `${json.excludedCount} pharmacie(s) fermée(s) ce jour-là n'ont pas été incluses dans le calcul.`
+        );
+      }
       if (json.unassignedCount > 0) {
         toast.warning(
           `Tournées calculées, mais ${json.unassignedCount} pharmacie(s) n'ont pas pu être intégrées dans une tournée respectant leur fenêtre horaire.`
@@ -103,6 +114,25 @@ export function OptimizeForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label htmlFor="deliveryDate">Date de livraison</Label>
+            <Input
+              id="deliveryDate"
+              type="date"
+              value={deliveryDate}
+              onChange={(e) => setDeliveryDate(e.target.value)}
+              disabled={disabled}
+              required
+            />
+            <p className={cn("text-xs", isSunday ? "text-destructive" : "text-muted-foreground")}>
+              {isSunday
+                ? "Aucune livraison n'est programmée le dimanche — choisissez un autre jour."
+                : weekday
+                  ? `${WEEKDAY_LABELS[weekday]} — seules les pharmacies ouvertes ce jour-là seront incluses.`
+                  : ""}
+            </p>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="vehicleCount">Nombre de véhicules</Label>
             <Input
@@ -172,7 +202,9 @@ export function OptimizeForm({
           <div className="sm:col-span-2">
             <Button
               type="submit"
-              disabled={disabled || loading || !solverAvailability[solverProvider]?.configured}
+              disabled={
+                disabled || loading || isSunday || !solverAvailability[solverProvider]?.configured
+              }
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
