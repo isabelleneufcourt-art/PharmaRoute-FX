@@ -146,9 +146,10 @@ model RouteStop {
   /// Position dans la séquence de la tournée (1 = premier arrêt après le dépôt)
   sequence Int
 
-  /// Heure estimée d'arrivée, format "HH:mm"
+  /// Heure de livraison effective, format "HH:mm" (= heure d'arrivée du véhicule,
+  /// ou heure d'ouverture du créneau s'il arrive en avance et doit patienter)
   etaArrival String
-  /// Heure estimée de départ (arrivée + temps de déchargement), format "HH:mm"
+  /// Heure de départ de l'arrêt (heure de livraison + temps de déchargement), format "HH:mm"
   etaDeparture String
 
   /// La fenêtre horaire de la pharmacie est-elle respectée ?

@@ -1,54 +1,61 @@
 import Link from "next/link";
-import { ArrowLeft, Route as RouteIcon } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
-import { prisma } from "@/lib/prisma";
+import { OptimizationHistory } from "@/components/optimize/optimization-history";
+import { OptimizeForm } from "@/components/optimize/optimize-form";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function OptimizePage() {
-  const [depot, pharmacyCount] = await Promise.all([
+  const [depot, pharmacyCount, recentOptimizations] = await Promise.all([
     prisma.depot.findFirst({ where: { isActive: true } }),
-    prisma.pharmacy.count(),
+    prisma.pharmacy.count({ where: { isActive: true } }),
+    prisma.optimization.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
   ]);
+
+  const canOptimize = Boolean(depot) && pharmacyCount > 0;
+  const suggestedVehicleCount = Math.max(1, Math.min(8, Math.ceil(pharmacyCount / 4) || 1));
 
   return (
     <div className="container flex flex-col gap-6 py-6">
       <div>
         <h1 className="text-xl font-semibold">Lancer une optimisation</h1>
         <p className="text-sm text-muted-foreground">
-          Écran 2 — choix du nombre de véhicules et de l&apos;heure de départ du dépôt (VRPTW).
+          Calcul des tournées (VRPTW) à partir du dépôt central et des pharmacies importées.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <RouteIcon className="h-4 w-4 text-primary" />
-            <CardTitle>Prochaine étape</CardTitle>
-          </div>
-          <CardDescription>
-            Ce formulaire de lancement (véhicules, heure de départ, appel au solver VRPTW) sera
-            construit à l&apos;étape suivante, une fois le dépôt et les pharmacies en place.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 text-sm">
-          <p>
-            Dépôt configuré :{" "}
-            <span className="font-medium">{depot ? depot.name : "aucun pour le moment"}</span>
-          </p>
-          <p>
-            Pharmacies importées : <span className="font-medium">{pharmacyCount}</span>
-          </p>
-          <Button asChild variant="outline" className="w-fit">
-            <Link href="/">
-              <ArrowLeft className="h-4 w-4" />
-              Retour au dépôt & pharmacies
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+      {!canOptimize && (
+        <Card className="border-warning/40 bg-warning/5">
+          <CardContent className="flex flex-col items-start gap-3 py-4 text-sm sm:flex-row sm:items-center">
+            <AlertCircle className="h-5 w-5 shrink-0 text-warning" />
+            <div className="flex-1">
+              {!depot && <p>Configurez d&apos;abord le dépôt central.</p>}
+              {depot && pharmacyCount === 0 && (
+                <p>Importez au moins une pharmacie avant de lancer une optimisation.</p>
+              )}
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/">Aller au tableau de bord</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <OptimizeForm
+        defaultDepartureTime={depot?.openingTime ?? "06:30"}
+        pharmacyCount={pharmacyCount}
+        suggestedVehicleCount={suggestedVehicleCount}
+        disabled={!canOptimize}
+      />
+
+      <OptimizationHistory optimizations={recentOptimizations} />
     </div>
   );
 }

@@ -1,0 +1,140 @@
+"use client";
+
+import * as React from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Clock, Package } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { formatDurationMinutes } from "@/lib/time";
+import type { RouteWithStops } from "@/types";
+
+interface RouteListPanelProps {
+  routes: RouteWithStops[];
+}
+
+export function RouteListPanel({ routes }: RouteListPanelProps) {
+  if (routes.length === 0) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Aucune tournée générée pour cette optimisation.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      {routes.map((route) => (
+        <RouteCard key={route.id} route={route} />
+      ))}
+    </div>
+  );
+}
+
+function RouteCard({ route }: { route: RouteWithStops }) {
+  const [open, setOpen] = React.useState(true);
+  const violations = route.stops.filter((s) => !s.withinTimeWindow).length;
+  const totalBacs = route.stops.reduce((sum, s) => sum + s.pharmacy.bacsCount, 0);
+
+  return (
+    <Card className="overflow-hidden py-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full flex-wrap items-center justify-between gap-2 p-4 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="h-3 w-3 shrink-0 rounded-full"
+            style={{ background: route.colorHex }}
+            aria-hidden
+          />
+          <span className="font-semibold">{route.vehicleLabel}</span>
+          <Badge variant="outline">
+            {route.stops.length} arrêt{route.stops.length > 1 ? "s" : ""}
+          </Badge>
+          <Badge variant="outline">
+            <Package className="h-3 w-3" />
+            {totalBacs}
+          </Badge>
+          {violations > 0 && (
+            <Badge variant="warning">
+              <AlertTriangle className="h-3 w-3" />
+              {violations} retard{violations > 1 ? "s" : ""}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {route.totalDistanceKm != null && <span>{route.totalDistanceKm.toFixed(1)} km</span>}
+          {route.totalDurationMin != null && (
+            <span>{formatDurationMinutes(route.totalDurationMin)}</span>
+          )}
+          <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+        </div>
+      </button>
+
+      {open &&
+        (route.stops.length === 0 ? (
+          <p className="px-4 pb-4 text-sm text-muted-foreground">Aucun arrêt assigné.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">#</TableHead>
+                <TableHead>Pharmacie</TableHead>
+                <TableHead>Créneau</TableHead>
+                <TableHead>ETA</TableHead>
+                <TableHead>Statut</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {route.stops.map((stop) => (
+                <TableRow key={stop.id}>
+                  <TableCell>
+                    <span
+                      className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                      style={{ background: route.colorHex }}
+                    >
+                      {stop.sequence}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-medium">{stop.pharmacy.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {stop.pharmacy.address}, {stop.pharmacy.postalCode} {stop.pharmacy.city}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    <Clock className="mb-0.5 mr-1 inline h-3 w-3" />
+                    {stop.pharmacy.timeWindowStart}–{stop.pharmacy.timeWindowEnd}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{stop.etaArrival}</TableCell>
+                  <TableCell>
+                    {stop.withinTimeWindow ? (
+                      <Badge variant="success">
+                        <CheckCircle2 className="h-3 w-3" />
+                        OK
+                      </Badge>
+                    ) : (
+                      <Badge variant="warning">
+                        <AlertTriangle className="h-3 w-3" />
+                        Hors créneau
+                      </Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ))}
+    </Card>
+  );
+}

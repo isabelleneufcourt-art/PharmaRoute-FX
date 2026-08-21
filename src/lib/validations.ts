@@ -52,3 +52,15 @@ export type PharmacyInput = z.infer<typeof pharmacySchema>;
 
 /** Version « brute » utilisée lors du parsing CSV/Excel, avant coercition stricte. */
 export const pharmacyImportRowSchema = pharmacySchema;
+
+export const optimizeRequestSchema = z
+  .object({
+    vehicleCount: z.coerce.number().int().min(1, "Au moins 1 véhicule").max(50),
+    departureTime: z.string().trim().regex(timeRegex, "Heure de départ invalide (HH:mm)"),
+    solverProvider: z
+      .enum(["INTERNAL", "GOOGLE_ROUTE_OPTIMIZATION", "OPENROUTE_VROOM"])
+      .default("INTERNAL"),
+  })
+  .strict();
+
+export type OptimizeRequestInput = z.infer<typeof optimizeRequestSchema>;
