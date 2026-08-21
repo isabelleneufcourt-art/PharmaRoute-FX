@@ -5,8 +5,14 @@ export type { Depot, Pharmacy, PharmacyTimeWindow, User };
 /** Utilisateur chauffeur, tel qu'exposé au dispatcher pour l'assignation de tournées. */
 export type DriverOption = Pick<User, "id" | "name" | "email">;
 
-/** Pharmacie avec sa grille hebdomadaire complète de créneaux (Lundi-Samedi). */
-export type PharmacyWithTimeWindows = Pharmacy & { timeWindows: PharmacyTimeWindow[] };
+/** Pharmacie avec sa grille hebdomadaire complète de créneaux (Lundi-Samedi) et son dépôt d'affectation. */
+export type PharmacyWithTimeWindows = Pharmacy & {
+  timeWindows: PharmacyTimeWindow[];
+  depot: Depot | null;
+};
+
+/** Dépôt avec le nombre de pharmacies qui lui sont affectées. */
+export type DepotWithPharmacyCount = Depot & { _count: { pharmacies: number } };
 
 export type OptimizationWithRoutes = Prisma.OptimizationGetPayload<{
   include: {

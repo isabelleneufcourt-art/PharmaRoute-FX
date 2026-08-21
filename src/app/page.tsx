@@ -7,11 +7,15 @@ import { PharmacyList } from "@/components/dashboard/pharmacy-list";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [depot, pharmacies] = await Promise.all([
-    prisma.depot.findFirst({ where: { isActive: true }, orderBy: { createdAt: "asc" } }),
+  const [depot, depots, pharmacies] = await Promise.all([
+    prisma.depot.findFirst({ where: { isDefault: true }, orderBy: { createdAt: "asc" } }),
+    prisma.depot.findMany({
+      where: { isActive: true },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    }),
     prisma.pharmacy.findMany({
       orderBy: [{ postalCode: "asc" }, { name: "asc" }],
-      include: { timeWindows: true },
+      include: { timeWindows: true, depot: true },
     }),
   ]);
 
@@ -20,14 +24,14 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-xl font-semibold">Tableau de bord</h1>
         <p className="text-sm text-muted-foreground">
-          Configurez votre dépôt central puis importez la liste de vos pharmacies clientes pour
+          Configurez votre dépôt principal puis importez la liste de vos pharmacies clientes pour
           préparer une optimisation de tournée.
         </p>
       </div>
 
       <DepotCard depot={depot} />
-      <PharmacyImport />
-      <PharmacyList pharmacies={pharmacies} />
+      <PharmacyImport depots={depots} />
+      <PharmacyList pharmacies={pharmacies} depots={depots} />
     </div>
   );
 }

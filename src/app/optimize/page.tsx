@@ -11,11 +11,14 @@ import { getSolverAvailability } from "@/lib/solver";
 export const dynamic = "force-dynamic";
 
 export default async function OptimizePage() {
-  const [depot, pharmacies, recentOptimizations] = await Promise.all([
-    prisma.depot.findFirst({ where: { isActive: true } }),
+  const [depots, pharmacies, recentOptimizations] = await Promise.all([
+    prisma.depot.findMany({
+      where: { isActive: true },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    }),
     prisma.pharmacy.findMany({
       where: { isActive: true },
-      select: { id: true, apbCode: true, name: true, postalCode: true, city: true },
+      select: { id: true, apbCode: true, name: true, postalCode: true, city: true, depotId: true },
       orderBy: [{ postalCode: "asc" }, { name: "asc" }],
     }),
     prisma.optimization.findMany({
@@ -24,8 +27,9 @@ export default async function OptimizePage() {
     }),
   ]);
 
+  const defaultDepot = depots.find((d) => d.isDefault) ?? depots[0] ?? null;
   const pharmacyCount = pharmacies.length;
-  const canOptimize = Boolean(depot) && pharmacyCount > 0;
+  const canOptimize = depots.length > 0 && pharmacyCount > 0;
   const suggestedVehicleCount = Math.max(1, Math.min(8, Math.ceil(pharmacyCount / 4) || 1));
   const solverAvailability = getSolverAvailability();
 
@@ -34,7 +38,7 @@ export default async function OptimizePage() {
       <div>
         <h1 className="text-xl font-semibold">Lancer une optimisation</h1>
         <p className="text-sm text-muted-foreground">
-          Calcul des tournées (VRPTW) à partir du dépôt central et des pharmacies importées.
+          Calcul des tournées (VRPTW) à partir du dépôt sélectionné et des pharmacies importées.
         </p>
       </div>
 
@@ -43,8 +47,8 @@ export default async function OptimizePage() {
           <CardContent className="flex flex-col items-start gap-3 py-4 text-sm sm:flex-row sm:items-center">
             <AlertCircle className="h-5 w-5 shrink-0 text-warning" />
             <div className="flex-1">
-              {!depot && <p>Configurez d&apos;abord le dépôt central.</p>}
-              {depot && pharmacyCount === 0 && (
+              {depots.length === 0 && <p>Configurez d&apos;abord au moins un dépôt.</p>}
+              {depots.length > 0 && pharmacyCount === 0 && (
                 <p>Importez au moins une pharmacie avant de lancer une optimisation.</p>
               )}
             </div>
@@ -56,7 +60,9 @@ export default async function OptimizePage() {
       )}
 
       <OptimizeForm
-        defaultDepartureTime={depot?.openingTime ?? "06:30"}
+        depots={depots}
+        defaultDepotId={defaultDepot?.id ?? ""}
+        defaultDepartureTime={defaultDepot?.openingTime ?? "06:30"}
         pharmacies={pharmacies}
         suggestedVehicleCount={suggestedVehicleCount}
         disabled={!canOptimize}

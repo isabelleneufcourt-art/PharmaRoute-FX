@@ -8,7 +8,7 @@ import type { NextAuthConfig } from "next-auth";
  * `src/auth.ts`, chargée uniquement côté serveur Node (routes API, pages).
  */
 
-const DISPATCHER_ONLY_PREFIXES = ["/optimize", "/results"];
+const DISPATCHER_ONLY_PREFIXES = ["/optimize", "/results", "/depots", "/pharmacies"];
 const DISPATCHER_ONLY_API_PREFIXES = [
   "/api/depot",
   "/api/pharmacies",

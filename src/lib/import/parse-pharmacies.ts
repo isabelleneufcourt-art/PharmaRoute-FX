@@ -48,7 +48,19 @@ const FIELD_ALIASES: Record<FlatField, string[]> = {
     "heure_cle",
     "cle",
   ],
+  // "depotId" est résolu à partir de la colonne "Depot"/"Code_Depot" (nom ou code de
+  // dépôt en texte libre), voir DEPOT_COLUMN_ALIASES et mapRawRowToPharmacyInput.
+  depotId: [],
 };
+
+/** Alias reconnus pour la colonne "dépôt d'affectation" (nom ou code du dépôt). */
+const DEPOT_COLUMN_ALIASES = ["depot", "code_depot", "depot_code", "secteur", "warehouse"];
+
+export interface DepotLookupOption {
+  id: string;
+  name: string;
+  code: string | null;
+}
 
 /** Alias reconnus pour chaque colonne "jour" de la grille hebdomadaire. */
 const DAY_COLUMN_ALIASES: Record<WeekdayId, string[]> = {
@@ -155,7 +167,8 @@ export async function readSpreadsheetFile(file: File): Promise<Record<string, st
 
 /** Associe les colonnes brutes du fichier aux champs métier attendus par PharmaRoute FX. */
 function mapRawRowToPharmacyInput(
-  raw: Record<string, string>
+  raw: Record<string, string>,
+  depots: DepotLookupOption[]
 ): { candidate: Record<string, unknown>; errors: string[] } {
   const normalizedEntries = Object.entries(raw).map(
     ([key, value]) => [normalizeHeader(key), value] as const
@@ -176,6 +189,23 @@ function mapRawRowToPharmacyInput(
   candidate.earlyAccessEnabled = typeof candidate.earlyAccessTime === "string";
 
   const errors: string[] = [];
+
+  // "depotId" est résolu à partir du nom ou du code du dépôt indiqué en texte libre
+  // (colonne "Depot"/"Code_Depot") : correspondance sur le code en priorité, puis sur
+  // le nom (accents/casse ignorés). Cellule vide ou colonne absente = pas d'affectation
+  // explicite, la pharmacie reste rattachée au dépôt principal.
+  const depotMatch = normalizedEntries.find(([key]) => DEPOT_COLUMN_ALIASES.includes(key));
+  if (depotMatch && depotMatch[1] !== "") {
+    const needle = normalizeHeader(depotMatch[1]);
+    const depot = depots.find(
+      (d) => (d.code && normalizeHeader(d.code) === needle) || normalizeHeader(d.name) === needle
+    );
+    if (depot) {
+      candidate.depotId = depot.id;
+    } else {
+      errors.push(`Depot : aucun dépôt trouvé pour "${depotMatch[1]}"`);
+    }
+  }
   const weekly: Partial<Record<WeekdayId, DayWindowsInput>> = {};
   let anyDayColumnFound = false;
 
@@ -219,9 +249,12 @@ function mapRawRowToPharmacyInput(
 }
 
 /** Parse et valide chaque ligne d'un fichier importé, ligne par ligne. */
-export function mapRowsToPharmacies(rows: Record<string, string>[]): ParsedPharmacyRow[] {
+export function mapRowsToPharmacies(
+  rows: Record<string, string>[],
+  depots: DepotLookupOption[] = []
+): ParsedPharmacyRow[] {
   return rows.map((raw, index) => {
-    const { candidate, errors: dayErrors } = mapRawRowToPharmacyInput(raw);
+    const { candidate, errors: dayErrors } = mapRawRowToPharmacyInput(raw, depots);
     if (dayErrors.length > 0) {
       return { rowIndex: index, raw, data: null, errors: dayErrors };
     }
@@ -255,6 +288,7 @@ export const CSV_TEMPLATE_HEADERS = [
   "Vendredi",
   "Samedi",
   "Heure acces chauffeur (Sas/Cle)",
+  "Depot",
   "Nombre de bacs",
   "Temps dechargement",
   "Contact",
@@ -275,6 +309,7 @@ export const CSV_TEMPLATE_EXAMPLE_ROW = [
   "08:30-12:30;14:00-18:30",
   "09:00-12:30",
   "07:30",
+  "",
   "3",
   "5",
   "J. Dupont",

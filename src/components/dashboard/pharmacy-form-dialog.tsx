@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-import type { PharmacyWithTimeWindows } from "@/types";
+import type { Depot, PharmacyWithTimeWindows } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,12 +18,24 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { WeeklyWindowsEditor } from "@/components/dashboard/weekly-windows-editor";
 import { rowsToWeeklyWindows } from "@/lib/pharmacy-windows";
 import { defaultWeeklyWindows, type WeeklyWindowsInput } from "@/lib/validations";
 
+/** Sentinelle pour "pas d'affectation explicite" dans le <Select> (le Select ne peut
+ *  pas utiliser une valeur vide) — converti en `null` avant l'envoi au serveur. */
+const PRINCIPAL_DEPOT_VALUE = "__principal__";
+
 interface PharmacyFormDialogProps {
   pharmacy?: PharmacyWithTimeWindows;
+  depots: Depot[];
   /** Rendu personnalisé du déclencheur (sinon un bouton par défaut est utilisé). */
   trigger?: React.ReactNode;
 }
@@ -41,7 +53,7 @@ const emptyForm = {
   notes: "",
 };
 
-export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProps) {
+export function PharmacyFormDialog({ pharmacy, depots, trigger }: PharmacyFormDialogProps) {
   const router = useRouter();
   const isEdit = Boolean(pharmacy);
   const [open, setOpen] = React.useState(false);
@@ -70,6 +82,7 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
     pharmacy?.earlyAccessEnabled ?? false
   );
   const [earlyAccessTime, setEarlyAccessTime] = React.useState(pharmacy?.earlyAccessTime ?? "07:30");
+  const [depotId, setDepotId] = React.useState(pharmacy?.depotId ?? PRINCIPAL_DEPOT_VALUE);
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -89,6 +102,7 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
           timeWindows,
           earlyAccessEnabled,
           earlyAccessTime: earlyAccessEnabled ? earlyAccessTime : null,
+          depotId: depotId === PRINCIPAL_DEPOT_VALUE ? null : depotId,
         }),
       });
       const json = await res.json();
@@ -189,6 +203,25 @@ export function PharmacyFormDialog({ pharmacy, trigger }: PharmacyFormDialogProp
               required
             />
             {errors.city && <p className="text-xs text-destructive">{errors.city}</p>}
+          </div>
+
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label htmlFor="depotId">Dépôt / secteur d&apos;affectation</Label>
+            <Select value={depotId} onValueChange={setDepotId}>
+              <SelectTrigger id="depotId">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={PRINCIPAL_DEPOT_VALUE}>Dépôt principal (par défaut)</SelectItem>
+                {depots.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                    {d.isDefault ? " (principal)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.depotId && <p className="text-xs text-destructive">{errors.depotId}</p>}
           </div>
 
           <div className="flex flex-col gap-1.5 sm:col-span-2">

@@ -47,20 +47,26 @@ vers `/login`.
 
 ## Écrans
 
-1. **Dépôt & Pharmacies** (`/`) — gestion du dépôt central, import CSV/Excel
+1. **Dépôt & Pharmacies** (`/`) — gestion du dépôt principal, import CSV/Excel
    des pharmacies clientes (code APB, adresse belge, grille horaire
-   hebdomadaire, bacs), liste avec recherche/édition/suppression.
-   *Dispatcher uniquement.*
-2. **Optimisation** (`/optimize`) — formulaire de lancement (véhicules, date
-   de livraison, heure de départ, choix du solver VRPTW). *Dispatcher
-   uniquement.*
-3. **Résultats** (`/results`, `/results/[id]`) — vue split-screen : tournées
+   hebdomadaire, dépôt d'affectation, bacs), liste avec
+   recherche/édition/suppression. *Dispatcher uniquement.*
+2. **Carte des pharmacies** (`/pharmacies/map`) — carte Leaflet interactive de
+   toutes les pharmacies (couleur par dépôt), filtre par dépôt/secteur,
+   sélection au clic (popup) puis envoi de la sélection vers l'écran
+   Optimisation. *Dispatcher uniquement.*
+3. **Dépôts** (`/depots`) — création/édition/suppression de dépôts multiples,
+   définition du dépôt principal. *Dispatcher uniquement.*
+4. **Optimisation** (`/optimize`) — formulaire de lancement (dépôt de départ,
+   véhicules, date de livraison, heure de départ, sélection des pharmacies,
+   choix du solver VRPTW). *Dispatcher uniquement.*
+5. **Résultats** (`/results`, `/results/[id]`) — vue split-screen : tournées
    avec ETA/respect de créneau à gauche, carte Leaflet à droite ; assignation
    d'un chauffeur par tournée. *Dispatcher uniquement.*
-4. **Feuille de route chauffeur** (`/driver-sheet/[routeId]`) — case à cocher
+6. **Feuille de route chauffeur** (`/driver-sheet/[routeId]`) — case à cocher
    par livraison, compteur de bacs vides récupérés, impression/export PDF.
    *Dispatcher (n'importe laquelle) ou chauffeur assigné à cette tournée.*
-5. **Mes tournées** (`/my-routes`) — accueil du chauffeur : liste de ses
+7. **Mes tournées** (`/my-routes`) — accueil du chauffeur : liste de ses
    tournées assignées. *Chauffeur uniquement.*
 
 ## Authentification & rôles
@@ -84,12 +90,15 @@ chaque carte de tournée.
 
 - `User` — compte (email + mot de passe hashé bcrypt), rôle `DISPATCHER` ou
   `DRIVER`.
-- `Depot` — point de départ/retour des tournées.
+- `Depot` — point de départ/retour des tournées. Plusieurs dépôts sont
+  possibles (`code` optionnel pour l'import CSV, `isDefault` marque le dépôt
+  principal — un seul à la fois, géré par l'application).
 - `Pharmacy` — client de livraison : code APB, adresse belge (CP à 4
   chiffres), grille horaire hebdomadaire (`PharmacyTimeWindow[]`, voir
   ci-dessous), nombre de bacs, temps de déchargement fixe
   (`serviceTimeMinutes`, 5 min par défaut), livraison hors-horaires optionnelle
-  (`earlyAccessEnabled` + `earlyAccessTime`, voir ci-dessous).
+  (`earlyAccessEnabled` + `earlyAccessTime`, voir ci-dessous), dépôt
+  d'affectation optionnel (`depotId` — `null` = rattachée au dépôt principal).
 - `PharmacyTimeWindow` — un créneau d'ouverture pour une pharmacie donnée :
   `weekday` (`MONDAY`…`SATURDAY`), `period` (`MORNING`/`AFTERNOON`),
   `startTime`/`endTime` (`HH:mm`). Une pharmacie peut avoir jusqu'à 2
@@ -154,16 +163,49 @@ quelle sur la fiche pharmacie), ce paramètre est dédié et indépendant :
   `HH:mm` active automatiquement l'accès anticipé pour la ligne ; une cellule
   vide le laisse désactivé.
 
+## Gestion multi-dépôts
+
+L'écran **Dépôts** (`/depots`) permet de créer et gérer plusieurs dépôts
+(nom, code court optionnel, adresse, heure de départ par défaut). Un seul
+dépôt est marqué **principal** à la fois (bouton "Définir principal") : il
+sert de dépôt par défaut pour les pharmacies sans affectation explicite et
+est pré-sélectionné à l'écran Optimisation. Le dépôt principal ne peut pas
+être supprimé ; un dépôt utilisé par des optimisations existantes non plus
+(désaffectez-le d'abord).
+
+Chaque pharmacie peut être affectée à un dépôt/secteur précis via le
+sélecteur "Dépôt / secteur d'affectation" du formulaire pharmacie (`/`) —
+`null`/"Dépôt principal" par défaut. Sur l'écran Optimisation, le sélecteur
+**"Dépôt de départ"** détermine à la fois le point de départ/retour des
+véhicules et filtre la liste de pharmacies proposées à celles affectées à ce
+dépôt (plus celles sans affectation, si le dépôt principal est sélectionné).
+
+## Carte des pharmacies
+
+L'écran **Carte** (`/pharmacies/map`) affiche toutes les pharmacies
+géolocalisées sur une carte Leaflet interactive, avec un marqueur par dépôt
+(icône "D") et un marqueur par pharmacie coloré selon son dépôt d'affectation
+(même palette que les tournées). Un filtre **"Dépôt/secteur"** limite
+l'affichage à un dépôt donné. Cliquer sur un marqueur pharmacie ouvre une
+info-bulle (nom, adresse, code APB, bacs, dépôt) avec une case à cocher pour
+la sélectionner ; les boutons "Tout sélectionner (visible)" / "Tout
+désélectionner" agissent sur les pharmacies actuellement affichées.
+
+Le bouton **"Envoyer vers l'optimisation"** redirige vers `/optimize` avec la
+sélection pré-cochée (et le dépôt correspondant pré-sélectionné, si toute la
+sélection appartient au même dépôt) — pratique pour préparer une tournée sur
+un sous-secteur géographique directement depuis la carte.
+
 ## Sélection des pharmacies à inclure
 
-L'écran Optimisation liste toutes les pharmacies actives sous forme de cases
-à cocher (toutes cochées par défaut), avec une barre de recherche (nom, code
-APB, code postal, ville) pour retrouver rapidement quelques pharmacies parmi
-une longue liste, et des boutons "Tout sélectionner" / "Tout désélectionner".
-Le calcul ne porte que sur les pharmacies cochées — pratique pour ne
-planifier qu'une partie de la tournée (ex. une zone, ou un sous-ensemble de
-clients pour un test). La sélection est mémorisée sur l'optimisation créée et
-réutilisée automatiquement par le bouton de ré-optimisation ci-dessous.
+L'écran Optimisation liste les pharmacies du dépôt sélectionné sous forme de
+cases à cocher (toutes cochées par défaut), avec une barre de recherche (nom,
+code APB, code postal, ville) pour retrouver rapidement quelques pharmacies
+parmi une longue liste, et des boutons "Tout sélectionner" / "Tout
+désélectionner". Le calcul ne porte que sur les pharmacies cochées —
+pratique pour ne planifier qu'une partie de la tournée (ex. un sous-ensemble
+de clients pour un test). La sélection est mémorisée sur l'optimisation créée
+et réutilisée automatiquement par le bouton de ré-optimisation ci-dessous.
 
 ## Ajustement automatique en cas de retard
 
@@ -189,6 +231,13 @@ français courants : `Code APB`, `Nom`, `Adresse`, `CP`, `Ville`,
 d'import. Chaque ligne est validée individuellement (code postal belge à 4
 chiffres, cohérence début < fin par créneau) et un ré-import met à jour les
 pharmacies existantes (upsert par code APB) au lieu de créer des doublons.
+
+**Colonne dépôt** : une colonne `Depot` ou `Code_Depot` (facultative) affecte
+la pharmacie à un dépôt existant, par correspondance sur son **code** en
+priorité puis sur son **nom** (accents/casse ignorés). Cellule vide = pas
+d'affectation explicite (rattachée au dépôt principal) ; une valeur qui ne
+correspond à aucun dépôt connu produit une erreur explicite sur la ligne
+("Depot : aucun dépôt trouvé pour…") plutôt que d'être ignorée silencieusement.
 
 **Colonnes horaires** : une colonne par jour (`Lundi`, `Mardi`, `Mercredi`,
 `Jeudi`, `Vendredi`, `Samedi`), chaque cellule contenant 0, 1 ou 2 créneaux

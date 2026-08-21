@@ -28,12 +28,17 @@ import {
   buildCsvTemplate,
   mapRowsToPharmacies,
   readSpreadsheetFile,
+  type DepotLookupOption,
   type ParsedPharmacyRow,
 } from "@/lib/import/parse-pharmacies";
 import type { PharmacyInput } from "@/lib/validations";
 import { WEEKDAYS } from "@/lib/weekday";
 
 const MAX_PREVIEW_ROWS = 200;
+
+interface PharmacyImportProps {
+  depots: DepotLookupOption[];
+}
 
 /** Nombre de créneaux ouverts dans la semaine (sur 12 possibles : 6 jours × 2 créneaux). */
 function countOpenSlots(timeWindows: PharmacyInput["timeWindows"]): number {
@@ -43,7 +48,7 @@ function countOpenSlots(timeWindows: PharmacyInput["timeWindows"]): number {
   }, 0);
 }
 
-export function PharmacyImport() {
+export function PharmacyImport({ depots }: PharmacyImportProps) {
   const router = useRouter();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = React.useState<string | null>(null);
@@ -65,7 +70,7 @@ export function PharmacyImport() {
         toast.error("Le fichier est vide ou n'a pas pu être lu");
         return;
       }
-      const parsed = mapRowsToPharmacies(raw);
+      const parsed = mapRowsToPharmacies(raw, depots);
       setRows(parsed);
       toast.info(
         `${parsed.length} ligne${parsed.length > 1 ? "s" : ""} détectée${
@@ -148,7 +153,7 @@ export function PharmacyImport() {
           <CardDescription>
             Fichier CSV ou Excel : code APB, nom, adresse belge, CP, ville, grille horaire
             Lundi-Samedi (matin/après-midi), heure d&apos;accès chauffeur (sas/clé) optionnelle,
-            nombre de bacs.
+            dépôt d&apos;affectation optionnel (colonne Depot/Code_Depot), nombre de bacs.
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
@@ -228,6 +233,7 @@ export function PharmacyImport() {
                         <TableHead>Nom</TableHead>
                         <TableHead>CP / Ville</TableHead>
                         <TableHead>Grille horaire</TableHead>
+                        <TableHead>Dépôt</TableHead>
                         <TableHead>Bacs</TableHead>
                         <TableHead>Statut</TableHead>
                       </TableRow>
@@ -254,6 +260,11 @@ export function PharmacyImport() {
                                 · Sas {row.data.earlyAccessTime}
                               </span>
                             )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {row.data
+                              ? (depots.find((d) => d.id === row.data!.depotId)?.name ?? "Principal")
+                              : "—"}
                           </TableCell>
                           <TableCell>{row.data?.bacsCount ?? "—"}</TableCell>
                           <TableCell>

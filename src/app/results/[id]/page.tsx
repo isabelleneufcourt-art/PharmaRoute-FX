@@ -128,6 +128,7 @@ export default async function ResultsDetailPage({ params }: { params: { id: stri
         <div className="no-print px-4 pt-3">
           <DelaySuggestionBanner
             violationsCount={optimization.violationsCount}
+            depotId={optimization.depotId}
             vehicleCount={optimization.vehicleCount}
             departureTime={optimization.departureTime}
             deliveryDate={formatDateOnly(optimization.deliveryDate)}

@@ -15,6 +15,7 @@ const SUGGESTED_DEPARTURE_SHIFT_MIN = 30;
 
 interface DelaySuggestionBannerProps {
   violationsCount: number;
+  depotId: string;
   vehicleCount: number;
   departureTime: string;
   deliveryDate: string;
@@ -27,6 +28,7 @@ type Suggestion = "ADD_VEHICLE" | "SHIFT_DEPARTURE";
 
 export function DelaySuggestionBanner({
   violationsCount,
+  depotId,
   vehicleCount,
   departureTime,
   deliveryDate,
@@ -47,6 +49,7 @@ export function DelaySuggestionBanner({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          depotId,
           vehicleCount: suggestion === "ADD_VEHICLE" ? vehicleCount + 1 : vehicleCount,
           departureTime: suggestion === "SHIFT_DEPARTURE" ? earlierDeparture : departureTime,
           deliveryDate,

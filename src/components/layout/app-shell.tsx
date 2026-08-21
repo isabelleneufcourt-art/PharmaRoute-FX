@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { ClipboardList, LayoutDashboard, ListChecks, Route as RouteIcon, Truck } from "lucide-react";
+import {
+  ClipboardList,
+  LayoutDashboard,
+  ListChecks,
+  MapPinned,
+  Route as RouteIcon,
+  Truck,
+  Warehouse,
+} from "lucide-react";
 
 import { auth } from "@/auth";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -7,6 +15,8 @@ import { cn } from "@/lib/utils";
 
 const DISPATCHER_NAV_ITEMS = [
   { href: "/", label: "Dépôt & Pharmacies", icon: LayoutDashboard },
+  { href: "/pharmacies/map", label: "Carte", icon: MapPinned },
+  { href: "/depots", label: "Dépôts", icon: Warehouse },
   { href: "/optimize", label: "Optimisation", icon: RouteIcon },
   { href: "/results", label: "Résultats", icon: ClipboardList },
 ];

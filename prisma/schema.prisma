@@ -35,10 +35,14 @@ model User {
   @@map("users")
 }
 
-/// Dépôt central (point de départ / retour des tournées)
+/// Dépôt (point de départ / retour des tournées) — plusieurs dépôts sont possibles
+/// (gestion multi-dépôts / secteurs), chacun avec ses propres pharmacies affectées.
 model Depot {
   id          String   @id @default(cuid())
   name        String
+  /// Code court optionnel (ex: "BXL"), utilisé pour affecter des pharmacies à ce
+  /// dépôt lors de l'import CSV (colonne "Depot" / "Code_Depot").
+  code        String?  @unique
   address     String
   postalCode  String
   city        String
@@ -46,11 +50,16 @@ model Depot {
   longitude   Float?
   /// Heure d'ouverture du dépôt / heure de départ par défaut, format "HH:mm"
   openingTime String   @default("06:30")
+  /// Dépôt principal : utilisé par défaut pour les pharmacies sans affectation
+  /// explicite (`Pharmacy.depotId` = null) et pré-sélectionné à l'écran Optimisation.
+  /// Un seul dépôt doit être marqué principal à la fois (géré par l'application).
+  isDefault Boolean  @default(false)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   optimizations Optimization[]
+  pharmacies    Pharmacy[]
 
   @@map("depots")
 }
@@ -102,6 +111,11 @@ model Pharmacy {
   /// Heure la plus tôt à laquelle le chauffeur peut effectuer le dépôt (sas/clé),
   /// format "HH:mm" — utilisée par le solver comme horaire d'accès anticipé.
   earlyAccessTime String?
+
+  /// Dépôt/secteur d'affectation de cette pharmacie. `null` = pas d'affectation
+  /// explicite, la pharmacie est alors rattachée au dépôt principal (Depot.isDefault).
+  depotId String?
+  depot   Depot?  @relation(fields: [depotId], references: [id], onDelete: SetNull)
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { vehicleCount, departureTime, deliveryDate, solverProvider, pharmacyIds } =
+    const { depotId, vehicleCount, departureTime, deliveryDate, solverProvider, pharmacyIds } =
       optimizeRequestSchema.parse(body);
 
     const deliveryDateObj = parseDateOnly(deliveryDate);
@@ -61,10 +61,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const depot = await prisma.depot.findFirst({ where: { isActive: true } });
+    const depot = await prisma.depot.findFirst({ where: { id: depotId, isActive: true } });
     if (!depot) {
       return NextResponse.json(
-        { error: "Configurez d'abord le dépôt central avant de lancer une optimisation" },
+        { error: "Dépôt de départ introuvable. Sélectionnez un dépôt valide." },
         { status: 400 }
       );
     }

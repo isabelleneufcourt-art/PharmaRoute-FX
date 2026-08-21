@@ -14,6 +14,9 @@ export const dateOnlyRegex = /^\d{4}-\d{2}-\d{2}$/;
 export const depotSchema = z
   .object({
     name: z.string().trim().min(2, "Le nom du dépôt est requis (2 caractères min.)"),
+    /** Code court optionnel (ex: "BXL"), utilisé pour l'affectation des pharmacies à
+     *  l'import CSV (colonne "Depot" / "Code_Depot"). */
+    code: z.string().trim().toUpperCase().optional().or(z.literal("")),
     address: z.string().trim().min(3, "L'adresse est requise"),
     postalCode: z
       .string()
@@ -91,6 +94,9 @@ export const pharmacySchema = z
       .regex(belgianPostalCodeRegex, "Code postal belge invalide (4 chiffres)"),
     city: z.string().trim().min(2, "La ville est requise"),
     timeWindows: weeklyWindowsSchema,
+    /** Dépôt/secteur d'affectation. `null` = pas d'affectation explicite, la
+     *  pharmacie est rattachée au dépôt principal (Depot.isDefault). */
+    depotId: z.string().trim().min(1).nullable().default(null),
     /** Livraison hors-horaires (sas de dépôt / clé confiée au chauffeur) : indique au
      *  solver qu'un accès anticipé est possible, sans modifier l'horaire réel de
      *  l'officine (grille `timeWindows` ci-dessus, inchangée). */
@@ -142,6 +148,8 @@ export const pharmacyImportRowSchema = pharmacySchema;
 
 export const optimizeRequestSchema = z
   .object({
+    /** Dépôt de départ/retour des véhicules pour ce calcul. */
+    depotId: z.string().trim().min(1, "Sélectionnez un dépôt de départ"),
     vehicleCount: z.coerce.number().int().min(1, "Au moins 1 véhicule").max(50),
     departureTime: z.string().trim().regex(timeRegex, "Heure de départ invalide (HH:mm)"),
     deliveryDate: z.string().trim().regex(dateOnlyRegex, "Date de livraison invalide"),

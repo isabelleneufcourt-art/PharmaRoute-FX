@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Boxes, KeyRound, MapPin, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import type { PharmacyWithTimeWindows } from "@/types";
+import type { Depot, PharmacyWithTimeWindows } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,7 @@ import { DELIVERY_PERIOD_LABELS, WEEKDAY_LABELS, WEEKDAY_SHORT_LABELS, WEEKDAYS 
 
 interface PharmacyListProps {
   pharmacies: PharmacyWithTimeWindows[];
+  depots: Depot[];
 }
 
 /** Résumé compact de la grille hebdomadaire : un badge par jour, plein si un créneau est ouvert. */
@@ -66,7 +67,7 @@ function WeeklyWindowsSummary({ pharmacy }: { pharmacy: PharmacyWithTimeWindows 
   );
 }
 
-export function PharmacyList({ pharmacies }: PharmacyListProps) {
+export function PharmacyList({ pharmacies, depots }: PharmacyListProps) {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -117,7 +118,7 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
               className="w-64 pl-8"
             />
           </div>
-          <PharmacyFormDialog />
+          <PharmacyFormDialog depots={depots} />
         </div>
       </CardHeader>
       <CardContent>
@@ -135,6 +136,7 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
                 <TableHead>Pharmacie</TableHead>
                 <TableHead>Adresse</TableHead>
                 <TableHead>Grille (Lun→Sam)</TableHead>
+                <TableHead>Dépôt</TableHead>
                 <TableHead>Bacs</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -164,6 +166,11 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {pharmacy.depot?.name ?? (
+                      <span className="italic">Principal</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">
                       <Boxes className="h-3 w-3" />
@@ -172,7 +179,7 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <PharmacyFormDialog pharmacy={pharmacy} />
+                      <PharmacyFormDialog pharmacy={pharmacy} depots={depots} />
                       <Button
                         variant="ghost"
                         size="icon"
@@ -187,7 +194,7 @@ export function PharmacyList({ pharmacies }: PharmacyListProps) {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     Aucun résultat pour « {query} »
                   </TableCell>
                 </TableRow>

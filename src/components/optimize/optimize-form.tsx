@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Play, Search, Truck } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,9 +32,18 @@ interface PharmacyOption {
   name: string;
   postalCode: string;
   city: string;
+  depotId: string | null;
+}
+
+interface DepotOption {
+  id: string;
+  name: string;
+  isDefault: boolean;
 }
 
 interface OptimizeFormProps {
+  depots: DepotOption[];
+  defaultDepotId: string;
   defaultDepartureTime: string;
   pharmacies: PharmacyOption[];
   suggestedVehicleCount: number;
@@ -56,6 +65,8 @@ function normalize(value: string): string {
 }
 
 export function OptimizeForm({
+  depots,
+  defaultDepotId,
   defaultDepartureTime,
   pharmacies,
   suggestedVehicleCount,
@@ -63,15 +74,40 @@ export function OptimizeForm({
   solverAvailability,
 }: OptimizeFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Pré-remplissage optionnel depuis la carte des pharmacies (`/pharmacies/map`) :
+  // dépôt et/ou sélection de pharmacies passés en paramètres d'URL.
+  const initialDepotId = searchParams.get("depotId") || defaultDepotId;
+  const initialPharmacyIds = React.useMemo(() => {
+    const raw = searchParams.get("pharmacyIds");
+    return raw ? new Set(raw.split(",").filter(Boolean)) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [depotId, setDepotId] = React.useState(initialDepotId);
   const [vehicleCount, setVehicleCount] = React.useState(String(suggestedVehicleCount));
   const [departureTime, setDepartureTime] = React.useState(defaultDepartureTime);
   const [deliveryDate, setDeliveryDate] = React.useState(() => formatDateOnly(new Date()));
   const [solverProvider, setSolverProvider] = React.useState<SolverProviderId>("INTERNAL");
   const [loading, setLoading] = React.useState(false);
-  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(
-    () => new Set(pharmacies.map((p) => p.id))
-  );
   const [search, setSearch] = React.useState("");
+
+  const eligiblePharmacies = React.useMemo(
+    () =>
+      pharmacies.filter((p) =>
+        p.depotId ? p.depotId === depotId : depotId === defaultDepotId
+      ),
+    [pharmacies, depotId, defaultDepotId]
+  );
+
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => {
+    if (initialPharmacyIds) {
+      const eligibleIds = new Set(eligiblePharmacies.map((p) => p.id));
+      return new Set(Array.from(initialPharmacyIds).filter((id) => eligibleIds.has(id)));
+    }
+    return new Set(eligiblePharmacies.map((p) => p.id));
+  });
 
   const selectedHint = solverAvailability[solverProvider]?.hint;
   const weekday = deliveryDate ? getWeekdayFromDate(parseDateOnly(deliveryDate)) : null;
@@ -79,11 +115,22 @@ export function OptimizeForm({
 
   const filteredPharmacies = React.useMemo(() => {
     const term = normalize(search.trim());
-    if (!term) return pharmacies;
-    return pharmacies.filter((p) =>
+    if (!term) return eligiblePharmacies;
+    return eligiblePharmacies.filter((p) =>
       [p.name, p.apbCode, p.postalCode, p.city].some((field) => normalize(field).includes(term))
     );
-  }, [pharmacies, search]);
+  }, [eligiblePharmacies, search]);
+
+  function handleDepotChange(nextDepotId: string) {
+    setDepotId(nextDepotId);
+    // Changer de dépôt change le périmètre de pharmacies concernées : on
+    // resélectionne automatiquement tout ce qui appartient au nouveau dépôt.
+    const nextEligible = pharmacies.filter((p) =>
+      p.depotId ? p.depotId === nextDepotId : nextDepotId === defaultDepotId
+    );
+    setSelectedIds(new Set(nextEligible.map((p) => p.id)));
+    setSearch("");
+  }
 
   function toggleOne(id: string, checked: boolean) {
     setSelectedIds((prev) => {
@@ -95,7 +142,7 @@ export function OptimizeForm({
   }
 
   function selectAll() {
-    setSelectedIds(new Set(pharmacies.map((p) => p.id)));
+    setSelectedIds(new Set(eligiblePharmacies.map((p) => p.id)));
   }
 
   function deselectAll() {
@@ -117,6 +164,7 @@ export function OptimizeForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          depotId,
           vehicleCount: Number(vehicleCount),
           departureTime,
           deliveryDate,
@@ -170,6 +218,27 @@ export function OptimizeForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label htmlFor="depotId">Dépôt de départ</Label>
+            <Select value={depotId} onValueChange={handleDepotChange} disabled={disabled}>
+              <SelectTrigger id="depotId">
+                <SelectValue placeholder="Sélectionnez un dépôt" />
+              </SelectTrigger>
+              <SelectContent>
+                {depots.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                    {d.isDefault ? " (principal)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Point de départ et de retour des véhicules. Seules les pharmacies affectées à ce
+              dépôt (ou sans affectation, si dépôt principal) sont proposées ci-dessous.
+            </p>
+          </div>
+
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <Label htmlFor="deliveryDate">Date de livraison</Label>
             <Input
@@ -259,7 +328,7 @@ export function OptimizeForm({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Label>Pharmacies à inclure</Label>
               <Badge variant={noneSelected ? "warning" : "outline"}>
-                {selectedIds.size} / {pharmacies.length} sélectionnée
+                {selectedIds.size} / {eligiblePharmacies.length} sélectionnée
                 {selectedIds.size > 1 ? "s" : ""}
               </Badge>
             </div>
@@ -298,7 +367,11 @@ export function OptimizeForm({
 
             <div className="max-h-64 overflow-y-auto rounded-md border border-border">
               {filteredPharmacies.length === 0 ? (
-                <p className="p-3 text-sm text-muted-foreground">Aucune pharmacie ne correspond.</p>
+                <p className="p-3 text-sm text-muted-foreground">
+                  {eligiblePharmacies.length === 0
+                    ? "Aucune pharmacie affectée à ce dépôt."
+                    : "Aucune pharmacie ne correspond."}
+                </p>
               ) : (
                 <ul className="divide-y divide-border">
                   {filteredPharmacies.map((pharmacy) => {
