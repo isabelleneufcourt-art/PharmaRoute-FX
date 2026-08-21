@@ -252,6 +252,19 @@ Pour compatibilité avec d'anciens fichiers, les alias `Heure Debut`/
 `Heure Fin` (un seul créneau, appliqué à tous les jours Lundi-Samedi) restent
 acceptés si aucune colonne journalière n'est présente dans le fichier.
 
+**Tolérance sur la grille horaire** : contrairement au formulaire manuel
+(`/`), l'import n'exige pas qu'au moins un créneau soit renseigné. Une ligne
+sans aucune colonne horaire, ou avec des cellules toutes vides, est importée
+quand même — grille entièrement fermée — plutôt que rejetée. Elle est
+simplement signalée dans l'aperçu (badge orange "Sans créneau", compteur
+dédié à côté de "X valides"/"X erreurs") et reste visible tout aussi
+signalée dans la liste des pharmacies une fois importée : cette pharmacie ne
+sera incluse dans aucune optimisation tant qu'une grille horaire n'aura pas
+été complétée depuis le tableau de bord. Les autres champs (code APB, nom,
+adresse, CP, ville) restent requis : ce sont les identifiants essentiels à
+l'upsert et au géocodage, une ligne qui en manque produit toujours une erreur
+bloquante.
+
 ## Solver VRPTW — simulation interne vs trajets routiers réels
 
 L'écran Optimisation propose trois moteurs ; celui sélectionné est mémorisé

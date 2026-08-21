@@ -1,7 +1,12 @@
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
-import { pharmacyImportRowSchema, type DayWindowsInput, type PharmacyInput } from "@/lib/validations";
+import {
+  emptyWeeklyWindows,
+  pharmacyImportRowSchema,
+  type DayWindowsInput,
+  type PharmacyInput,
+} from "@/lib/validations";
 import { WEEKDAY_LABELS, WEEKDAYS, type WeekdayId } from "@/lib/weekday";
 
 /** Normalise un intitulé de colonne : minuscules, sans accents, séparé par "_". */
@@ -240,9 +245,13 @@ function mapRawRowToPharmacyInput(
       const legacyWeekly: Record<string, DayWindowsInput> = {};
       for (const day of WEEKDAYS) legacyWeekly[day] = dayWindows;
       candidate.timeWindows = legacyWeekly;
+    } else {
+      // Ni colonnes jour ni fenêtre "legacy" trouvées : grille entièrement fermée
+      // plutôt qu'une ligne rejetée — la pharmacie est importée sans créneau et
+      // signalée dans l'aperçu (voir countOpenSlots), à compléter plus tard depuis
+      // le tableau de bord.
+      candidate.timeWindows = emptyWeeklyWindows();
     }
-    // Sinon : ni colonnes jour ni fenêtre "legacy" → timeWindows absent, la validation
-    // zod ci-dessous produira un message d'erreur clair ("timeWindows : Required").
   }
 
   return { candidate, errors };

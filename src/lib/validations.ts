@@ -83,68 +83,100 @@ export function defaultWeeklyWindows(): WeeklyWindowsInput {
   };
 }
 
-export const pharmacySchema = z
-  .object({
-    apbCode: z.string().trim().min(1, "Le code APB est requis"),
-    name: z.string().trim().min(2, "Le nom de la pharmacie est requis"),
-    address: z.string().trim().min(3, "L'adresse est requise"),
-    postalCode: z
-      .string()
-      .trim()
-      .regex(belgianPostalCodeRegex, "Code postal belge invalide (4 chiffres)"),
-    city: z.string().trim().min(2, "La ville est requise"),
-    timeWindows: weeklyWindowsSchema,
-    /** Dépôt/secteur d'affectation. `null` = pas d'affectation explicite, la
-     *  pharmacie est rattachée au dépôt principal (Depot.isDefault). */
-    depotId: z.string().trim().min(1).nullable().default(null),
-    /** Livraison hors-horaires (sas de dépôt / clé confiée au chauffeur) : indique au
-     *  solver qu'un accès anticipé est possible, sans modifier l'horaire réel de
-     *  l'officine (grille `timeWindows` ci-dessus, inchangée). */
-    earlyAccessEnabled: z.boolean().default(false),
-    earlyAccessTime: z
-      .string()
-      .trim()
-      .regex(timeRegex, "Heure d'accès invalide (HH:mm)")
-      .nullable()
-      .default(null),
-    bacsCount: z.coerce.number().int().min(1, "Au moins 1 bac").max(999),
-    serviceTimeMinutes: z.coerce.number().int().min(0).max(180).default(5),
-    contactName: z.string().trim().optional().or(z.literal("")),
-    contactPhone: z.string().trim().optional().or(z.literal("")),
-    notes: z.string().trim().optional().or(z.literal("")),
-  })
+/** Grille entièrement fermée (aucun créneau renseigné) — repli utilisé par l'import
+ *  CSV/Excel quand aucune information horaire n'est présente sur la ligne. */
+export function emptyWeeklyWindows(): WeeklyWindowsInput {
+  const closed = { morning: null, afternoon: null };
+  return {
+    MONDAY: closed,
+    TUESDAY: closed,
+    WEDNESDAY: closed,
+    THURSDAY: closed,
+    FRIDAY: closed,
+    SATURDAY: closed,
+  };
+}
+
+const pharmacyObjectSchema = z.object({
+  apbCode: z.string().trim().min(1, "Le code APB est requis"),
+  name: z.string().trim().min(2, "Le nom de la pharmacie est requis"),
+  address: z.string().trim().min(3, "L'adresse est requise"),
+  postalCode: z
+    .string()
+    .trim()
+    .regex(belgianPostalCodeRegex, "Code postal belge invalide (4 chiffres)"),
+  city: z.string().trim().min(2, "La ville est requise"),
+  timeWindows: weeklyWindowsSchema,
+  /** Dépôt/secteur d'affectation. `null` = pas d'affectation explicite, la
+   *  pharmacie est rattachée au dépôt principal (Depot.isDefault). */
+  depotId: z.string().trim().min(1).nullable().default(null),
+  /** Livraison hors-horaires (sas de dépôt / clé confiée au chauffeur) : indique au
+   *  solver qu'un accès anticipé est possible, sans modifier l'horaire réel de
+   *  l'officine (grille `timeWindows` ci-dessus, inchangée). */
+  earlyAccessEnabled: z.boolean().default(false),
+  earlyAccessTime: z
+    .string()
+    .trim()
+    .regex(timeRegex, "Heure d'accès invalide (HH:mm)")
+    .nullable()
+    .default(null),
+  bacsCount: z.coerce.number().int().min(1, "Au moins 1 bac").max(999),
+  serviceTimeMinutes: z.coerce.number().int().min(0).max(180).default(5),
+  contactName: z.string().trim().optional().or(z.literal("")),
+  contactPhone: z.string().trim().optional().or(z.literal("")),
+  notes: z.string().trim().optional().or(z.literal("")),
+});
+
+type PharmacyObjectInput = z.infer<typeof pharmacyObjectSchema>;
+
+const earlyAccessTimeRequiredRefinement = {
+  check: (data: PharmacyObjectInput) => !data.earlyAccessEnabled || Boolean(data.earlyAccessTime),
+  opts: { message: "Indiquez l'heure d'accès chauffeur (sas/clé)", path: ["earlyAccessTime"] },
+};
+
+const earlyAccessBeforeOpeningRefinement = {
+  check: (data: PharmacyObjectInput) => {
+    if (!data.earlyAccessEnabled || !data.earlyAccessTime) return true;
+    const earliestOpening = WEEKDAYS.flatMap((day) => [
+      data.timeWindows[day].morning,
+      data.timeWindows[day].afternoon,
+    ])
+      .filter((w): w is TimePeriodInput => w !== null)
+      .map((w) => w.start)
+      .sort()[0];
+    if (!earliestOpening) return true;
+    return data.earlyAccessTime < earliestOpening;
+  },
+  opts: {
+    message: "L'heure d'accès chauffeur doit précéder l'heure d'ouverture la plus tôt de la semaine",
+    path: ["earlyAccessTime"],
+  },
+};
+
+/** Schéma strict utilisé par le formulaire pharmacie (dashboard) : au moins un
+ *  créneau doit être renseigné dans la semaine. */
+export const pharmacySchema = pharmacyObjectSchema
   .strict()
   .refine((data) => WEEKDAYS.some((day) => data.timeWindows[day].morning || data.timeWindows[day].afternoon), {
     message: "Au moins un créneau doit être ouvert dans la semaine",
     path: ["timeWindows"],
   })
-  .refine((data) => !data.earlyAccessEnabled || Boolean(data.earlyAccessTime), {
-    message: "Indiquez l'heure d'accès chauffeur (sas/clé)",
-    path: ["earlyAccessTime"],
-  })
-  .refine(
-    (data) => {
-      if (!data.earlyAccessEnabled || !data.earlyAccessTime) return true;
-      const earliestOpening = WEEKDAYS.flatMap((day) => [
-        data.timeWindows[day].morning,
-        data.timeWindows[day].afternoon,
-      ])
-        .filter((w): w is TimePeriodInput => w !== null)
-        .map((w) => w.start)
-        .sort()[0];
-      if (!earliestOpening) return true;
-      return data.earlyAccessTime < earliestOpening;
-    },
-    {
-      message: "L'heure d'accès chauffeur doit précéder l'heure d'ouverture la plus tôt de la semaine",
-      path: ["earlyAccessTime"],
-    }
-  );
+  .refine(earlyAccessTimeRequiredRefinement.check, earlyAccessTimeRequiredRefinement.opts)
+  .refine(earlyAccessBeforeOpeningRefinement.check, earlyAccessBeforeOpeningRefinement.opts);
 
 export type PharmacyInput = z.infer<typeof pharmacySchema>;
 
-/** Version « brute » utilisée lors du parsing CSV/Excel, avant coercition stricte. */
-export const pharmacyImportRowSchema = pharmacySchema;
+/**
+ * Version utilisée lors du parsing CSV/Excel : plus tolérante que le formulaire
+ * manuel — une ligne sans aucun créneau renseigné reste importable (la pharmacie
+ * ne sera simplement incluse dans aucune optimisation tant qu'une grille horaire
+ * n'aura pas été complétée depuis le tableau de bord). L'aperçu d'import se charge
+ * de signaler ces lignes au dispatcher plutôt que de les rejeter.
+ */
+export const pharmacyImportRowSchema = pharmacyObjectSchema
+  .strict()
+  .refine(earlyAccessTimeRequiredRefinement.check, earlyAccessTimeRequiredRefinement.opts)
+  .refine(earlyAccessBeforeOpeningRefinement.check, earlyAccessBeforeOpeningRefinement.opts);
 
 export const optimizeRequestSchema = z
   .object({

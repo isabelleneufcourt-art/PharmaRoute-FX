@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, KeyRound, MapPin, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Boxes, KeyRound, MapPin, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import type { Depot, PharmacyWithTimeWindows } from "@/types";
@@ -154,6 +154,16 @@ export function PharmacyList({ pharmacies, depots }: PharmacyListProps) {
                   <TableCell>
                     <div className="flex flex-col items-start gap-1">
                       <WeeklyWindowsSummary pharmacy={pharmacy} />
+                      {pharmacy.timeWindows.length === 0 && (
+                        <Badge
+                          variant="warning"
+                          title="Aucun créneau configuré : cette pharmacie n'est incluse dans aucune optimisation."
+                          className="text-[10px]"
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          Sans créneau
+                        </Badge>
+                      )}
                       {pharmacy.earlyAccessEnabled && pharmacy.earlyAccessTime && (
                         <Badge
                           variant="secondary"

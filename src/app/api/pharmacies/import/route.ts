@@ -3,10 +3,13 @@ import { z, ZodError } from "zod";
 
 import { weeklyWindowsToRows } from "@/lib/pharmacy-windows";
 import { prisma } from "@/lib/prisma";
-import { pharmacySchema } from "@/lib/validations";
+import { pharmacyImportRowSchema } from "@/lib/validations";
 
 const importBodySchema = z.object({
-  pharmacies: z.array(pharmacySchema).min(1, "Aucune pharmacie valide à importer"),
+  // Revalidation serveur avec le schéma « import » (tolérant : une grille sans
+  // aucun créneau reste acceptée) — doit rester cohérent avec la validation faite
+  // côté client lors du parsing du fichier (src/lib/import/parse-pharmacies.ts).
+  pharmacies: z.array(pharmacyImportRowSchema).min(1, "Aucune pharmacie valide à importer"),
 });
 
 /**

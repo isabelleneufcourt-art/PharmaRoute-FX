@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Download,
   FileSpreadsheet,
@@ -59,6 +60,10 @@ export function PharmacyImport({ depots }: PharmacyImportProps) {
 
   const validRows = rows.filter((r) => r.data !== null);
   const invalidRows = rows.filter((r) => r.data === null);
+  // Lignes valides mais sans aucun créneau renseigné : importées quand même,
+  // simplement signalées (elles ne seront incluses dans aucune optimisation
+  // tant qu'une grille horaire n'aura pas été complétée).
+  const noScheduleRows = validRows.filter((r) => countOpenSlots(r.data!.timeWindows) === 0);
 
   async function processFile(file: File) {
     setParsing(true);
@@ -152,8 +157,10 @@ export function PharmacyImport({ depots }: PharmacyImportProps) {
           <CardTitle>Import des pharmacies clientes</CardTitle>
           <CardDescription>
             Fichier CSV ou Excel : code APB, nom, adresse belge, CP, ville, grille horaire
-            Lundi-Samedi (matin/après-midi), heure d&apos;accès chauffeur (sas/clé) optionnelle,
-            dépôt d&apos;affectation optionnel (colonne Depot/Code_Depot), nombre de bacs.
+            Lundi-Samedi (matin/après-midi) — optionnelle, une pharmacie sans créneau reste
+            importable et sera simplement signalée —, heure d&apos;accès chauffeur (sas/clé)
+            optionnelle, dépôt d&apos;affectation optionnel (colonne Depot/Code_Depot), nombre de
+            bacs.
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
@@ -202,6 +209,15 @@ export function PharmacyImport({ depots }: PharmacyImportProps) {
                       <CheckCircle2 className="h-3 w-3" />
                       {validRows.length} valide{validRows.length > 1 ? "s" : ""}
                     </Badge>
+                    {noScheduleRows.length > 0 && (
+                      <Badge
+                        variant="warning"
+                        title="Ces pharmacies seront importées, mais ne seront incluses dans aucune optimisation tant qu'une grille horaire n'aura pas été complétée."
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        {noScheduleRows.length} sans créneau
+                      </Badge>
+                    )}
                     {invalidRows.length > 0 && (
                       <Badge variant="destructive">
                         <AlertCircle className="h-3 w-3" />
@@ -254,7 +270,19 @@ export function PharmacyImport({ depots }: PharmacyImportProps) {
                               : "—"}
                           </TableCell>
                           <TableCell className="font-mono text-xs">
-                            {row.data ? `${countOpenSlots(row.data.timeWindows)} créneaux/sem.` : "—"}
+                            {row.data ? (
+                              <span
+                                className={
+                                  countOpenSlots(row.data.timeWindows) === 0
+                                    ? "text-warning"
+                                    : undefined
+                                }
+                              >
+                                {countOpenSlots(row.data.timeWindows)} créneaux/sem.
+                              </span>
+                            ) : (
+                              "—"
+                            )}
                             {row.data?.earlyAccessEnabled && row.data.earlyAccessTime && (
                               <span className="ml-1 font-sans text-muted-foreground">
                                 · Sas {row.data.earlyAccessTime}
@@ -269,10 +297,21 @@ export function PharmacyImport({ depots }: PharmacyImportProps) {
                           <TableCell>{row.data?.bacsCount ?? "—"}</TableCell>
                           <TableCell>
                             {row.data ? (
-                              <Badge variant="success">
-                                <CheckCircle2 className="h-3 w-3" />
-                                OK
-                              </Badge>
+                              countOpenSlots(row.data.timeWindows) === 0 ? (
+                                <Badge
+                                  variant="warning"
+                                  title="Aucun créneau renseigné — pharmacie importée mais exclue de toute optimisation tant que sa grille horaire n'est pas complétée."
+                                  className="cursor-help"
+                                >
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Sans créneau
+                                </Badge>
+                              ) : (
+                                <Badge variant="success">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  OK
+                                </Badge>
+                              )
                             ) : (
                               <Badge
                                 variant="destructive"
