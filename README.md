@@ -231,6 +231,11 @@ français courants : `Code APB`, `Nom`, `Adresse`, `CP`, `Ville`,
 d'import. Chaque ligne est validée individuellement (code postal belge à 4
 chiffres, cohérence début < fin par créneau) et un ré-import met à jour les
 pharmacies existantes (upsert par code APB) au lieu de créer des doublons.
+Les fichiers volumineux (plusieurs milliers de lignes) sont traités par lots
+de 200 côté serveur pour rester robuste ; en cas d'échec en cours de route, le
+message d'erreur indique combien de lignes ont déjà été importées — un
+nouvel essai est toujours sûr (upsert), il ne duplique jamais ce qui l'a déjà
+été.
 
 **Colonne dépôt** : une colonne `Depot` ou `Code_Depot` (facultative) affecte
 la pharmacie à un dépôt existant, par correspondance sur son **code** en
