@@ -9,6 +9,7 @@ import { RouteListPanel } from "@/components/results/route-list-panel";
 import { RouteMapLoader } from "@/components/results/route-map-loader";
 import { formatDurationMinutes } from "@/lib/time";
 import { SOLVER_PROVIDER_LABELS } from "@/lib/solver/labels";
+import { findDepartureShiftBlocker } from "@/lib/solver/delay-diagnosis";
 import { prisma } from "@/lib/prisma";
 import { formatDateOnly } from "@/lib/weekday";
 
@@ -62,6 +63,7 @@ export default async function ResultsDetailPage({ params }: { params: { id: stri
   const selectedPharmacyIds: string[] | null = optimization.selectedPharmacyIds
     ? (JSON.parse(optimization.selectedPharmacyIds) as string[])
     : null;
+  const departureShiftBlocker = findDepartureShiftBlocker(optimization.routes);
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
@@ -134,6 +136,7 @@ export default async function ResultsDetailPage({ params }: { params: { id: stri
             deliveryDate={formatDateOnly(optimization.deliveryDate)}
             solverProvider={optimization.solverProvider}
             selectedPharmacyIds={selectedPharmacyIds}
+            departureShiftBlocker={departureShiftBlocker}
           />
         </div>
       )}

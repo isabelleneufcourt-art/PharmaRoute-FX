@@ -222,6 +222,18 @@ Chaque clic crée une nouvelle optimisation (visible dans l'historique) et
 redirige vers ses résultats ; l'optimisation d'origine reste consultable si
 l'ajustement ne convient pas.
 
+**Quand "Avancer le départ" ne peut pas aider** : si un arrêt plus tôt dans la
+même tournée que le retard est déjà en attente de l'ouverture de son propre
+créneau (le véhicule y arrive avant l'heure d'ouverture et patiente), cette
+attente absorbe intégralement tout avancement de l'heure de départ — aucun
+arrêt suivant n'est donc jamais avancé, retard compris, même en répétant
+l'opération. L'écran Résultats détecte ce cas et affiche un message dédié
+nommant l'arrêt bloquant plutôt que de laisser relancer sans effet visible ;
+la durée totale de la tournée continue de changer (le véhicule attend plus ou
+moins longtemps), ce qui peut faire croire à tort que le calcul a changé
+quelque chose. Dans ce cas, mieux vaut ajouter un véhicule, ou vérifier si un
+accès anticipé (sas/clé) est possible chez la pharmacie qui bloque.
+
 ## Import CSV/Excel des pharmacies
 
 Le formulaire d'import (`/`) accepte `.csv`, `.xlsx`, `.xls`. Les en-têtes de
