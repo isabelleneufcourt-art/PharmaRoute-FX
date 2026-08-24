@@ -7,6 +7,7 @@ import {
   Route as RouteIcon,
   Truck,
   Warehouse,
+  Waypoints,
 } from "lucide-react";
 
 import { auth } from "@/auth";
@@ -17,6 +18,7 @@ const DISPATCHER_NAV_ITEMS = [
   { href: "/", label: "Dépôt & Pharmacies", icon: LayoutDashboard },
   { href: "/pharmacies/map", label: "Carte", icon: MapPinned },
   { href: "/depots", label: "Dépôts", icon: Warehouse },
+  { href: "/tournees", label: "Tournées types", icon: Waypoints },
   { href: "/optimize", label: "Optimisation", icon: RouteIcon },
   { href: "/results", label: "Résultats", icon: ClipboardList },
 ];

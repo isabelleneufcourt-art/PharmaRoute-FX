@@ -60,6 +60,7 @@ model Depot {
 
   optimizations Optimization[]
   pharmacies    Pharmacy[]
+  tourTemplates TourTemplate[]
 
   @@map("depots")
 }
@@ -125,6 +126,9 @@ model Pharmacy {
   /// L'absence de ligne pour un (jour, créneau) donné signifie "fermé" à ce moment-là.
   timeWindows PharmacyTimeWindow[]
   stops       RouteStop[]
+  /// Tournées types (plans de transport récurrents/théoriques) auxquelles cette
+  /// pharmacie est rattachée — indépendant des optimisations ponctuelles par date.
+  tourStops   TourTemplateStop[]
 
   @@map("pharmacies")
 }
@@ -146,6 +150,62 @@ model PharmacyTimeWindow {
 
   @@unique([pharmacyId, weekday, period])
   @@map("pharmacy_time_windows")
+}
+
+/// Tournée type : plan de transport général récurrent/théorique (ex: "Tournée Matin
+/// T01"), indépendant de la gestion des commandes au jour le jour. Regroupe un
+/// ensemble fixe de pharmacies dans un ordre de passage théorique, servant de
+/// référence pour la modélisation de la charge (bacs moyens estimés) et comme point
+/// de départ visuel (carte) pour comprendre le circuit d'une pharmacie donnée.
+model TourTemplate {
+  id String @id @default(cuid())
+
+  /// Code court unique (ex: "T01")
+  code String @unique
+  /// Nom complet affiché (ex: "Tournée Matin T01")
+  name String
+
+  depotId String
+  depot   Depot  @relation(fields: [depotId], references: [id])
+
+  /// Créneau théorique de la tournée (matin/après-midi) — `null` = journée complète
+  /// ou non spécifié.
+  period DeliveryPeriod?
+
+  /// Étiquette libre du véhicule type associé (ex: "Camionnette 1"), à titre indicatif.
+  vehicleLabel String?
+  /// Capacité théorique du véhicule en bacs, utilisée pour visualiser la charge de
+  /// cette tournée (somme des `bacsCount` des pharmacies incluses) par rapport à sa
+  /// capacité lors de la construction du plan de transport.
+  vehicleCapacityBacs Int?
+
+  notes String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stops TourTemplateStop[]
+
+  @@map("tour_templates")
+}
+
+/// Une pharmacie incluse dans une tournée type, avec son ordre de passage théorique.
+model TourTemplateStop {
+  id String @id @default(cuid())
+
+  tourTemplateId String
+  tourTemplate   TourTemplate @relation(fields: [tourTemplateId], references: [id], onDelete: Cascade)
+
+  pharmacyId String
+  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  /// Position théorique dans la tournée (1 = premier arrêt après le dépôt)
+  sequence Int
+
+  @@unique([tourTemplateId, pharmacyId])
+  @@index([pharmacyId])
+  @@map("tour_template_stops")
 }
 
 enum OptimizationStatus {

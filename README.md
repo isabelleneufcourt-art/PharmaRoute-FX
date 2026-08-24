@@ -57,16 +57,24 @@ vers `/login`.
    Optimisation. *Dispatcher uniquement.*
 3. **Dépôts** (`/depots`) — création/édition/suppression de dépôts multiples,
    définition du dépôt principal. *Dispatcher uniquement.*
-4. **Optimisation** (`/optimize`) — formulaire de lancement (dépôt de départ,
+4. **Fiche pharmacie** (`/pharmacies/[id]`) — informations générales (dépôt,
+   bacs moyens estimés, accès anticipé), grille horaire complète, et liste
+   des tournées types dans lesquelles la pharmacie est inscrite.
+   *Dispatcher uniquement.*
+5. **Tournées types** (`/tournees`, `/tournees/[id]`) — plans de transport
+   généraux récurrents/théoriques (circuits fixes de pharmacies), avec carte
+   interactive de l'itinéraire et suivi de la charge théorique (bacs) par
+   rapport à la capacité du véhicule. *Dispatcher uniquement.*
+6. **Optimisation** (`/optimize`) — formulaire de lancement (dépôt de départ,
    véhicules, date de livraison, heure de départ, sélection des pharmacies,
    choix du solver VRPTW). *Dispatcher uniquement.*
-5. **Résultats** (`/results`, `/results/[id]`) — vue split-screen : tournées
+7. **Résultats** (`/results`, `/results/[id]`) — vue split-screen : tournées
    avec ETA/respect de créneau à gauche, carte Leaflet à droite ; assignation
    d'un chauffeur par tournée. *Dispatcher uniquement.*
-6. **Feuille de route chauffeur** (`/driver-sheet/[routeId]`) — case à cocher
+8. **Feuille de route chauffeur** (`/driver-sheet/[routeId]`) — case à cocher
    par livraison, compteur de bacs vides récupérés, impression/export PDF.
    *Dispatcher (n'importe laquelle) ou chauffeur assigné à cette tournée.*
-7. **Mes tournées** (`/my-routes`) — accueil du chauffeur : liste de ses
+9. **Mes tournées** (`/my-routes`) — accueil du chauffeur : liste de ses
    tournées assignées. *Chauffeur uniquement.*
 
 ## Authentification & rôles
@@ -111,6 +119,40 @@ chaque carte de tournée.
   composée d'arrêts ordonnés avec ETA calculée, créneau retenu
   (`deliveryPeriod`, `scheduledWindowStart`/`End`), indicateur de respect de
   créneau, et suivi terrain (`completed`, `emptyBacsRetrieved`).
+- `TourTemplate` / `TourTemplateStop` — plan de transport général
+  récurrent/théorique ("tournée type" : `code`, `name`, dépôt, créneau
+  théorique, véhicule/capacité indicatifs), indépendant des optimisations
+  ponctuelles par date. Regroupe un ensemble fixe de pharmacies
+  (`TourTemplateStop.sequence` = ordre de passage théorique).
+
+## Tournées types — plans de transport récurrents
+
+Indépendamment de l'optimisation au jour le jour (`/optimize`), l'écran
+**Tournées types** (`/tournees`) permet de modéliser des circuits théoriques
+fixes et récurrents (ex. "Tournée Matin T01") :
+
+- Création/édition : code, nom, dépôt, créneau théorique (matin/après-midi/
+  journée complète), véhicule type et capacité indicative (en bacs), et la
+  liste ordonnée des pharmacies incluses (cases à cocher + recherche,
+  réordonnancement par flèches haut/bas).
+- **Charge théorique** : la somme des `bacsCount` ("bacs moyens estimés") des
+  pharmacies incluses est affichée en temps réel dans le formulaire et sur la
+  liste des tournées, avec un avertissement visuel si elle dépasse la
+  capacité indiquée du véhicule — un outil pour équilibrer manuellement la
+  charge entre plusieurs tournées types lors de la construction du plan.
+- **Carte interactive** (`/tournees/[id]`) : dépôt + pharmacies numérotées
+  dans leur ordre théorique, reliés par un tracé direct (pas de tracé
+  routier réel, ce circuit étant théorique et non calculé par un solver).
+- **Depuis la fiche pharmacie** (`/pharmacies/[id]`) : chaque pharmacie
+  liste les tournées types auxquelles elle est rattachée, cliquables pour
+  ouvrir directement la carte de la tournée correspondante et visualiser le
+  reste du circuit.
+
+Le champ `Pharmacy.bacsCount` ("Bacs moyens (estimation)" sur la fiche
+pharmacie) est le même utilisé par le solver VRPTW réel (`/optimize`) comme
+poids de charge pour répartir les arrêts entre véhicules — il n'y a qu'une
+seule valeur de charge par pharmacie, réutilisée à la fois pour les calculs
+ponctuels par date et pour la modélisation théorique des tournées types.
 
 ## Grille horaire hebdomadaire & optimisation par date
 

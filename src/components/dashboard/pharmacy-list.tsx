@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Boxes, KeyRound, MapPin, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -147,7 +148,11 @@ export function PharmacyList({ pharmacies, depots }: PharmacyListProps) {
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {pharmacy.apbCode}
                   </TableCell>
-                  <TableCell className="font-medium">{pharmacy.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/pharmacies/${pharmacy.id}`} className="hover:underline">
+                      {pharmacy.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {pharmacy.address}, {pharmacy.postalCode} {pharmacy.city}
                   </TableCell>

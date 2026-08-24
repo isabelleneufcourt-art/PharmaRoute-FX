@@ -1,0 +1,133 @@
+"use client";
+
+import * as React from "react";
+import L from "leaflet";
+import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+
+export interface TourMapDepot {
+  name: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface TourMapStop {
+  sequence: number;
+  pharmacy: {
+    id: string;
+    name: string;
+    address: string;
+    postalCode: string;
+    city: string;
+    bacsCount: number;
+    latitude: number | null;
+    longitude: number | null;
+  };
+}
+
+export interface TourTemplateMapProps {
+  depot: TourMapDepot;
+  stops: TourMapStop[];
+  colorHex: string;
+}
+
+const BRUSSELS_FALLBACK: [number, number] = [50.8503, 4.3517];
+
+function buildDepotIcon() {
+  return L.divIcon({
+    html: `<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9999px;background:#171717;color:white;font-size:12px;font-weight:700;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);">D</div>`,
+    className: "",
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15],
+  });
+}
+
+function buildStopIcon(number: number, color: string) {
+  return L.divIcon({
+    html: `<div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:9999px;background:${color};color:white;font-size:11px;font-weight:700;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);">${number}</div>`,
+    className: "",
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -13],
+  });
+}
+
+function FitBounds({ positions }: { positions: [number, number][] }) {
+  const map = useMap();
+  const key = positions.map((p) => p.join(",")).join("|");
+
+  React.useEffect(() => {
+    if (positions.length === 0) return;
+    if (positions.length === 1) {
+      map.setView(positions[0], 13);
+      return;
+    }
+    map.fitBounds(L.latLngBounds(positions), { padding: [40, 40] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, map]);
+
+  return null;
+}
+
+export default function TourTemplateMap({ depot, stops, colorHex }: TourTemplateMapProps) {
+  const depotPosition: [number, number] | null =
+    depot.latitude != null && depot.longitude != null ? [depot.latitude, depot.longitude] : null;
+
+  const stopPositions: [number, number][] = stops
+    .filter((s) => s.pharmacy.latitude != null && s.pharmacy.longitude != null)
+    .map((s) => [s.pharmacy.latitude as number, s.pharmacy.longitude as number]);
+
+  const allPositions = depotPosition ? [depotPosition, ...stopPositions] : stopPositions;
+  const center = depotPosition ?? stopPositions[0] ?? BRUSSELS_FALLBACK;
+
+  // Tracé théorique : trait direct dépôt → arrêts (dans l'ordre) → dépôt. Pas de tracé
+  // routier réel ici (circuit théorique, indépendant d'un calcul du solver).
+  const path = depotPosition ? [depotPosition, ...stopPositions, depotPosition] : stopPositions;
+
+  return (
+    <MapContainer center={center} zoom={11} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <FitBounds positions={allPositions} />
+
+      {depotPosition && (
+        <Marker position={depotPosition} icon={buildDepotIcon()}>
+          <Popup>
+            <strong>{depot.name}</strong>
+            <br />
+            {depot.address}
+          </Popup>
+        </Marker>
+      )}
+
+      {path.length > 1 && (
+        <Polyline positions={path} pathOptions={{ color: colorHex, weight: 4, opacity: 0.7, dashArray: "6 6" }} />
+      )}
+
+      {stops.map(
+        (stop) =>
+          stop.pharmacy.latitude != null &&
+          stop.pharmacy.longitude != null && (
+            <Marker
+              key={stop.pharmacy.id}
+              position={[stop.pharmacy.latitude, stop.pharmacy.longitude]}
+              icon={buildStopIcon(stop.sequence, colorHex)}
+            >
+              <Popup>
+                <strong>
+                  {stop.sequence}. {stop.pharmacy.name}
+                </strong>
+                <br />
+                {stop.pharmacy.address}, {stop.pharmacy.postalCode} {stop.pharmacy.city}
+                <br />
+                {stop.pharmacy.bacsCount} bac{stop.pharmacy.bacsCount > 1 ? "s" : ""} (estimation)
+              </Popup>
+            </Marker>
+          )
+      )}
+    </MapContainer>
+  );
+}

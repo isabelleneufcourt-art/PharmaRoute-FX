@@ -1,6 +1,13 @@
-import type { Depot, Pharmacy, PharmacyTimeWindow, Prisma, User } from "@/generated/prisma/client";
+import type {
+  Depot,
+  Pharmacy,
+  PharmacyTimeWindow,
+  Prisma,
+  TourTemplate,
+  User,
+} from "@/generated/prisma/client";
 
-export type { Depot, Pharmacy, PharmacyTimeWindow, User };
+export type { Depot, Pharmacy, PharmacyTimeWindow, TourTemplate, User };
 
 /** Utilisateur chauffeur, tel qu'exposé au dispatcher pour l'assignation de tournées. */
 export type DriverOption = Pick<User, "id" | "name" | "email">;
@@ -13,6 +20,36 @@ export type PharmacyWithTimeWindows = Pharmacy & {
 
 /** Dépôt avec le nombre de pharmacies qui lui sont affectées. */
 export type DepotWithPharmacyCount = Depot & { _count: { pharmacies: number } };
+
+/** Tournée type (plan de transport récurrent/théorique) telle qu'inscrite sur la fiche pharmacie. */
+export type PharmacyTourMembership = {
+  sequence: number;
+  tourTemplate: Pick<TourTemplate, "id" | "code" | "name" | "period" | "isActive">;
+};
+
+/** Pharmacie avec sa grille hebdomadaire, son dépôt, et les tournées types auxquelles elle appartient. */
+export type PharmacyDetail = PharmacyWithTimeWindows & {
+  tourStops: PharmacyTourMembership[];
+};
+
+export type TourTemplateStopWithPharmacy = {
+  id: string;
+  sequence: number;
+  pharmacy: Pharmacy;
+};
+
+/** Tournée type avec ses arrêts (pharmacies + ordre théorique), pour la carte et le formulaire. */
+export type TourTemplateWithStops = TourTemplate & {
+  depot: Depot;
+  stops: TourTemplateStopWithPharmacy[];
+};
+
+/** Tournée type telle que renvoyée par la liste : arrêts complets + compteur + charge théorique. */
+export type TourTemplateWithStopCount = TourTemplateWithStops & {
+  _count: { stops: number };
+  /** Somme des `bacsCount` des pharmacies incluses (charge théorique). */
+  totalBacs: number;
+};
 
 export type OptimizationWithRoutes = Prisma.OptimizationGetPayload<{
   include: {

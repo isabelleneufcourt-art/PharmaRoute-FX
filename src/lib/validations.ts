@@ -209,3 +209,36 @@ export const routeStopUpdateSchema = z
   });
 
 export type RouteStopUpdateInput = z.infer<typeof routeStopUpdateSchema>;
+
+/** Une pharmacie incluse dans une tournée type, avec son ordre de passage théorique. */
+const tourTemplateStopSchema = z
+  .object({
+    pharmacyId: z.string().trim().min(1),
+    sequence: z.coerce.number().int().min(1),
+  })
+  .strict();
+
+/** Plan de transport général récurrent/théorique ("tournée type"). */
+export const tourTemplateSchema = z
+  .object({
+    code: z.string().trim().min(1, "Le code de la tournée est requis (ex: T01)"),
+    name: z.string().trim().min(2, "Le nom de la tournée est requis"),
+    depotId: z.string().trim().min(1, "Sélectionnez un dépôt"),
+    period: z.enum(["MORNING", "AFTERNOON"]).nullable().default(null),
+    vehicleLabel: z.string().trim().optional().or(z.literal("")),
+    vehicleCapacityBacs: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? null : v),
+      z.coerce.number().int().min(1, "La capacité doit être d'au moins 1 bac").nullable()
+    ),
+    notes: z.string().trim().optional().or(z.literal("")),
+    stops: z
+      .array(tourTemplateStopSchema)
+      .min(1, "Ajoutez au moins une pharmacie à la tournée"),
+  })
+  .strict()
+  .refine(
+    (data) => new Set(data.stops.map((s) => s.pharmacyId)).size === data.stops.length,
+    { message: "Une pharmacie ne peut apparaître qu'une seule fois dans la tournée", path: ["stops"] }
+  );
+
+export type TourTemplateInput = z.infer<typeof tourTemplateSchema>;
